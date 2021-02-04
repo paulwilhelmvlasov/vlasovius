@@ -17,7 +17,7 @@ AC_SUBST([AM_CXXFLAGS],["$OPENMP_CXXFLAGS"])
 AX_BLAS([],[AC_MSG_ERROR([vlasovius requires BLAS.])])
 
 
-AX_CXX_COMPILE_STDCXX_11([noext],[mandatory])
+AX_CXX_COMPILE_STDCXX_17([noext],[mandatory])
 
 AC_SUBST([AM_CPPFLAGS],['-I$(top_srcdir)'])
 
