@@ -16,8 +16,6 @@ AX_BLAS([],[AC_MSG_ERROR([vorticus requires BLAS.])])
 AX_BOOST_BASE([1.61.0],,[AC_MSG_ERROR([vorticus requires Boost.])])
 AX_BOOST_REGEX
 
-AC_CHECK_LIB(gmp, __gmpz_init, ,
-  [AC_MSG_ERROR([GNU MP not found, see https://gmplib.org/])])
 
 AX_CXX_COMPILE_STDCXX_11([noext],[mandatory])
 
