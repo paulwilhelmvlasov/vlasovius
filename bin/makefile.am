@@ -1,0 +1,4 @@
+noinst_PROGRAMS = moin
+
+moin_SOURCES = moin.cpp
+moin_LDADD = $(BLAS_LIBS)

@@ -1,3 +1,5 @@
+
+
 AC_INIT([vlasovius],[0.1])
 AC_CANONICAL_SYSTEM
 AC_CONFIG_MACRO_DIR([m4])
@@ -13,8 +15,6 @@ AC_OPENMP
 AC_SUBST([AM_CXXFLAGS],["$OPENMP_CXXFLAGS"]) 
 
 AX_BLAS([],[AC_MSG_ERROR([vlasovius requires BLAS.])])
-AX_BOOST_BASE([1.61.0],,[AC_MSG_ERROR([vlasovius requires Boost.])])
-AX_BOOST_REGEX
 
 
 AX_CXX_COMPILE_STDCXX_11([noext],[mandatory])
