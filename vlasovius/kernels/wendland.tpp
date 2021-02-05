@@ -92,8 +92,8 @@ template <size_t dim, size_t k>
 double wendland( double r )
 {
 	using wendland_impl::wendland_coeffs;
-	constexpr    size_t                 N { wendland_impl::num_coeffs<dim,k>() };
-	static const wendland_coeffs<dim,k> c { wendland_impl::    coeffs<dim,k>() };
+	constexpr    size_t                    N { wendland_impl::num_coeffs<dim,k>() };
+	constexpr const wendland_coeffs<dim,k> c { wendland_impl::    coeffs<dim,k>() };
 
 	r = std::abs(r);
     r = std::min(r,1.0);
