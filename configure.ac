@@ -1,5 +1,3 @@
-
-
 AC_INIT([vlasovius],[0.1])
 AC_CANONICAL_SYSTEM
 AC_CONFIG_MACRO_DIR([m4])
@@ -15,9 +13,9 @@ AC_OPENMP
 AC_SUBST([AM_CXXFLAGS],["$OPENMP_CXXFLAGS"]) 
 
 AX_BLAS([],[AC_MSG_ERROR([vlasovius requires BLAS.])])
-
-
 AX_CXX_COMPILE_STDCXX_17([noext],[mandatory])
+AX_CHECK_X86_FEATURES
+
 
 AC_SUBST([AM_CPPFLAGS],['-I$(top_srcdir)'])
 

@@ -1,4 +1,7 @@
-noinst_PROGRAMS = moin
+noinst_PROGRAMS = moin test_wendland
 
 moin_SOURCES = moin.cpp
 moin_LDADD = $(BLAS_LIBS)
+
+test_wendland_SOURCES = test_wendland.cpp
+test_wendland_LDADD = $(BLAS_LIBS)

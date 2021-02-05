@@ -16,26 +16,48 @@
  * You should have received a copy of the GNU General Public License along with
  * vlasovius; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
-#ifndef VLASOVIUS_KERNELS_WENDLAND_H
-#define VLASOVIUS_KERNELS_WENDLAND_H
+#ifndef VLASOVIUS_MISC_STOPWATCH_H
+#define VLASOVIUS_MISC_STOPWATCH_H
 
-#include <armadillo>
+#include <chrono>
 
 namespace vlasovius
 {
 
-namespace kernels
+namespace misc
 {
 
-template <size_t dim, size_t k>
-double wendland( double r );
+class stopwatch
+{
+public:
+	void   reset();
+	double elapsed();
 
-template <size_t dim, size_t k>
-arma::vec wendland( const arma::vec &r );
+private:
+	using clock = std::chrono::high_resolution_clock;
+	clock::time_point t0 { clock::now() };
+};
 
+
+inline
+void stopwatch::reset()
+{
+	t0 = clock::now();
+}
+
+inline
+double stopwatch::elapsed()
+{
+	using seconds = std::chrono::duration<double,std::ratio<1,1>>;
+
+	auto tnow = clock::now();
+	auto duration = std::chrono::duration_cast<seconds>( tnow - t0 );
+
+	return duration.count();
 }
 
 }
 
-#include <vlasovius/kernels/wendland.tpp>
+}
+
 #endif
