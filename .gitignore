@@ -30,3 +30,4 @@ ltmain.sh
 m4/libtool.m4
 m4/lt*.m4
 /compile
+bin/test_wendland.exe.stackdump
