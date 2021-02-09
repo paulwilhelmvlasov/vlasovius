@@ -16,12 +16,16 @@ AX_BLAS([],[AC_MSG_ERROR([vlasovius requires BLAS.])])
 AX_CXX_COMPILE_STDCXX_17([noext],[mandatory])
 AX_CHECK_X86_FEATURES
 
+AC_SEARCH_LIBS([__gmpz_init], [gmp], [],
+  [AC_MSG_ERROR([GNU MP not found, see https://gmplib.org/])])
+
 
 AC_SUBST([AM_CPPFLAGS],['-I$(top_srcdir)'])
 
 AC_CONFIG_HEADERS([vlasovius/config.h])
 AC_CONFIG_FILES([Makefile
                  vlasovius/makefile
+                 vlasovius/kernels/makefile
                  bin/makefile])
 
 LT_INIT

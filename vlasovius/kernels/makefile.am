@@ -1,0 +1,4 @@
+noinst_LTLIBRARIES = libkernels.la
+
+libkernels_la_SOURCES= wendland.cpp
+libkernels_la_LIBADD  =
