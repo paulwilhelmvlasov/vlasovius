@@ -20,6 +20,7 @@
 #define VLASOVIUS_KERNELS_WENDLAND_H
 
 #include <armadillo>
+#include <vlasovius/config.h>
 
 namespace vlasovius
 {
@@ -28,10 +29,28 @@ namespace kernels
 {
 
 template <size_t dim, size_t k>
-double wendland( double r );
+class wendland
+{
+public:
+	wendland();
 
-template <size_t dim, size_t k>
-arma::vec wendland( const arma::vec &r );
+	// Copies sometimes could make sense, when passing a kernel by value and
+	// not ‘by type’ or by reference.
+	wendland( const wendland&  ) = default;
+	wendland(       wendland&& ) = default;
+
+	// Assignment does not make any sense.
+	wendland& operator=( const wendland&  ) = delete;
+	wendland& operator=(       wendland&& ) = delete;
+
+
+	// The heart of the matter: evaluation.
+	double    operator()( double r    ) const noexcept;
+	arma::vec operator()( arma::vec r ) const;
+
+private:
+	double  c [ (dim/2) + 3*k + 2 ];
+};
 
 }
 

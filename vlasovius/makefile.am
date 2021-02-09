@@ -1,1 +1,6 @@
- 
+SUBDIRS = kernels 
+
+noinst_LTLIBRARIES = libvlasovius.la
+
+libvlasovius_la_SOURCES = 
+libvlasovius_la_LIBADD   = kernels/libkernels.la

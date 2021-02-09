@@ -26,33 +26,24 @@
 
 int main( int argc, char* argv[] )
 {
-    using vlasovius::kernels::scalar_wendland;
-    using vlasovius::kernels::avx_wendland;
-    using vlasovius::misc::stopwatch;
+	using vlasovius::misc::stopwatch;
 
-    size_t N = 1000;
+
+    size_t N = 3000;
     constexpr size_t dim = 2, k = 4;
+    vlasovius::kernels::wendland<dim,k> W;
 
-    arma::vec xx( N+1 );
+    arma::vec x( N+1 );
 	for ( size_t i = 0; i <= N; ++i )
-		xx(i) = -1.5 + (3.0/N)*i;
-
+		x(i) = -1.5 + (3.0/N)*i;
 
 	stopwatch clock;
-	arma::vec v1 = scalar_wendland<dim,k>(xx);
+	arma::vec v = W(x);
 	double elapsed = clock.elapsed();
-	std::cout << "Time for scalar version: " << elapsed << ".\n";
-
-
-	clock.reset();
-	arma::vec v2 = avx_wendland<dim,k>( xx );
-	elapsed = clock.elapsed();
-	std::cout << "Time for AVX accelerated version: " << elapsed << ".\n";
-
-	std::cout << "Maximum difference between the two versions: " << norm( v1 - v2, "inf" ) << ".\n";
+	std::cout << "Time for evaluating: " << elapsed << ".\n";
 
 	std::ofstream file( "test_wendland.txt" );
-	for ( size_t i = 0; i < N; ++i )
-		file << xx(i) << " " << v1(i) << " " << v2(i) << std::endl;
+	for ( size_t i = 0; i <= N; ++i )
+		file << x(i) << " " << v(i) << std::endl;
 	return 0;
 }
