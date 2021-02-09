@@ -22,6 +22,10 @@
 #include <armadillo>
 #include <vlasovius/config.h>
 
+#if  defined(HAVE_AVX_INSTRUCTIONS) && defined(HAVE_FMA_INSTRUCTIONS)
+#include <immintrin.h>
+#endif
+
 namespace vlasovius
 {
 
