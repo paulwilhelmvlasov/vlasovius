@@ -1,4 +1,3 @@
-#include "directInterpolator.h"
 /*
  * Copyright (C) 2021 Matthias Kirchhart and Paul Wilhelm
  *
@@ -18,12 +17,18 @@
  * vlasovius; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
 
+#include "directInterpolator.h"
+
 template<typename kernel>
-inline directInterpolator<kernel>::directInterpolator
-(const std::vector<point>& X, const std::vector<double>& f) : interPolPoints(X)
+vlasovius::interpolators::directInterpolator<kernel>::directInterpolator
+(const std::vector<point>& X, const arma::vec& f) : interPolPoints(X)
 {
 	if (X.empty()) {
 		throw std::runtime_error("No interpolation-points passed.");
+	}
+
+	if (X.size() != f.size()) {
+		throw std::runtime_error("Number points does not match value vector length.");
 	}
 
 	arma::mat rkhsMat = computeRKHSMatrix(X);
@@ -31,7 +36,7 @@ inline directInterpolator<kernel>::directInterpolator
 }
 
 template<typename kernel>
-double operator(const point& x) const
+double vlasovius::interpolators::directInterpolator<kernel>::operator()(const point& x) const
 {
 	arma::vec v(N);
 
@@ -66,8 +71,8 @@ arma::mat vlasovius::interpolators::directInterpolator<kernel>::computeRKHSMatri
 
 template<typename kernel>
 void vlasovius::interpolators::directInterpolator<kernel>::computeCoeffVec
-(const arma::mat& rkhsMat, const std::vector<double>& f)
+(const arma::mat& rkhsMat, const arma::vec& f)
 {
-	coeff = solve(rkhsMat, f);
+	coeff = solve(rkhsMat, f); 
 }
 

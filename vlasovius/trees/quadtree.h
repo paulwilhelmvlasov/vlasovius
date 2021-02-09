@@ -16,44 +16,35 @@
  * You should have received a copy of the GNU General Public License along with
  * vlasovius; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
-#ifndef VLASOVIUS_INTERPOLATORS_DIRECTINTERPOLATOR_H
-#define VLASOVIUS_INTERPOLATORS_DIRECTINTERPOLATOR_H
-
-#include <armadillo>
-
-#include <vector>
+ 
+#ifndef VLASOVIUS_TREES_QUADTREE_H
+#define VLASOVIUS_TREES_QUADTREE_H
 
 namespace vlasovius
 {
-	typedef arma::vec point; 
-
-	namespace interpolators
+	namespace trees
 	{
-		template <typename kernel>
-		class directInterpolator
+		struct bounding_box_2d
+		{
+			bool pointInsideAABB(const arma::vec2& x, 
+				double tol = 1e-13);
+
+			double radius;
+			arma::vec2 center;
+		};
+
+
+
+		class quadtree
 		{
 		public:
-			directInterpolator(const std::vector<point>& X, 
-				const arma::vec& f,
-				double sigma = 1.0);
-			
-		public:
-			double operator()(const point& x) const;
+
+
 
 		private:
-			arma::mat computeRKHSMatrix(const std::vector<point>& X);
-			void computeCoeffVec(const arma::mat& rkhsMat, 
-				const arma::vec& f);
-
-		private:
-			long N;
-
-			arma::vec coeff;
-			const std::vector<point> interPolPoints; 
+			std::shared_ptr<std::vector<arma::vec2>> ptr_points;
 		};
 	}
+ }
 
-}
-
-//#include <vlasovius/interpolators/directInterpolator.cpp>
 #endif
