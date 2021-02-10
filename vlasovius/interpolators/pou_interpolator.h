@@ -16,58 +16,31 @@
  * You should have received a copy of the GNU General Public License along with
  * vlasovius; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
- 
-#ifndef VLASOVIUS_TREES_QUADTREE_H
-#define VLASOVIUS_TREES_QUADTREE_H
+#ifndef VLASOVIUS_INTERPOLATORS_POU_INTERPOLATOR_H
+#define VLASOVIUS_INTERPOLATORS_POU_INTERPOLATOR_H
 
 #include <vector>
-#include <deque>
 #include <armadillo>
 
 namespace vlasovius
 {
-	namespace trees
+	namespace interpolators
 	{
-		struct bounding_box_2d
-		{
-			bool pointInsideAABB(const arma::vec2& x, 
-				double tol = 1e-13);
-
-			double radius;
-			arma::vec2 center;
-		};
-
-		struct node
-		{
-			size_t parent   = 0;
-
-			size_t topLeft  = 0;
-			size_t topRight = 0;
-			size_t botRight = 0;
-			size_t botLeft  = 0;
-
-			std::vector<size_t> childIndices = {};
-
-			bounding_box_2d box;
-		};
-
-		class quadtree
+		class pou_interpolator
 		{
 		public:
-			quadtree(arma::mat& points, size_t minElemPerBox, size_t maxElemPerBox);
+			pou_interpolator(arma::mat points, 
+				const arma::vec& f,
+				double sigma = 1.0);
+			
+		public:
+			double operator()(const arma::vec& x) const;
 
 
 		private:
-			void buildTree(arma::mat& points, 
-				size_t minElemPerBox, size_t maxElemPerBox, 
-				node& currNode, size_t currIndex);
-
-		private:
-			std::deque<node> nodes;
-
-			arma::mat points;
 		};
 	}
- }
+
+}
 
 #endif
