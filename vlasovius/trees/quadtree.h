@@ -20,6 +20,8 @@
 #ifndef VLASOVIUS_TREES_QUADTREE_H
 #define VLASOVIUS_TREES_QUADTREE_H
 
+#include <armadillo>
+
 namespace vlasovius
 {
 	namespace trees
@@ -38,11 +40,12 @@ namespace vlasovius
 		class quadtree
 		{
 		public:
+			quadtree(arma::mat points);
 
 
 
 		private:
-			std::shared_ptr<std::vector<arma::vec2>> ptr_points;
+			arma::mat points;
 		};
 	}
  }
