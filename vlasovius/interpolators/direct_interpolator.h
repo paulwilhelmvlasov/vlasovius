@@ -16,44 +16,36 @@
  * You should have received a copy of the GNU General Public License along with
  * vlasovius; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
-#ifndef VLASOVIUS_INTERPOLATORS_DIRECTINTERPOLATOR_H
-#define VLASOVIUS_INTERPOLATORS_DIRECTINTERPOLATOR_H
-
-#include <armadillo>
+#ifndef VLASOVIUS_INTERPOLATORS_DIRECT_INTERPOLATOR_H
+#define VLASOVIUS_INTERPOLATORS_DIRECT_INTERPOLATOR_H
 
 #include <vector>
+#include <armadillo>
 
 namespace vlasovius
 {
-	typedef arma::vec point; 
 
-	namespace interpolators
-	{
-		template <typename kernel>
-		class directInterpolator
-		{
-		public:
-			directInterpolator(const std::vector<point>& X, 
-				const arma::vec& f,
-				double sigma = 1.0);
-			
-		public:
-			double operator()(const point& x) const;
+namespace interpolators
+{
 
-		private:
-			arma::mat computeRKHSMatrix(const std::vector<point>& X);
-			void computeCoeffVec(const arma::mat& rkhsMat, 
-				const arma::vec& f);
+template <typename kernel>
+class direct_interpolator
+{
+public:
+	direct_interpolator( kernel K, arma::mat X, arma::vec b, double tikhonov_mu = 0 );
 
-		private:
-			long N;
+	arma::vec operator()( const arma::mat &Y ) const;
+	arma::vec coeffs() const { return coeff; }
 
-			arma::vec coeff;
-			const std::vector<point> interPolPoints; 
-		};
-	}
+private:
+	kernel    K;
+	arma::mat X;
+	arma::vec coeff;
+};
 
 }
 
-//#include <vlasovius/interpolators/directInterpolator.cpp>
+}
+
+#include <vlasovius/interpolators/direct_interpolator.tpp>
 #endif

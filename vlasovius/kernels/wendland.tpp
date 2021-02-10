@@ -74,8 +74,9 @@ arma::vec wendland<dim,k>::operator()( arma::vec rvec ) const
 	__m256d sign_mask  = _mm256_set1_pd(-0.0);
 	__m256d ones       = _mm256_set1_pd( 1.0);
 
-	size_t chunk;
-	for ( chunk = 0; chunk < rvec.size()/4; ++chunk )
+	size_t num_chunks = rvec.size()/4;
+	#pragma omp parallel for schedule(static)
+	for ( size_t chunk = 0; chunk < num_chunks; ++chunk )
 	{
 		__m256d r = _mm256_loadu_pd( rvec.memptr() + 4*chunk );
 		r = _mm256_andnot_pd( sign_mask, r ); // r = abs(r);
@@ -109,7 +110,7 @@ arma::vec wendland<dim,k>::operator()( arma::vec rvec ) const
 	}
 
 	// Compute the remaining entries in scalar mode.
-	for ( size_t i = 4*chunk; i < rvec.size(); ++i )
+	for ( size_t i = 4*num_chunks; i < rvec.size(); ++i )
 		rvec[i] = (*this)(rvec[i]);
 
 	return rvec;
@@ -120,6 +121,7 @@ arma::vec wendland<dim,k>::operator()( arma::vec rvec ) const
 template <size_t dim, size_t k>
 arma::vec wendland<dim,k>::operator()( arma::vec r ) const
 {
+	#pragma omp parallel for schedule(static)
 	for ( size_t i = 0; i < r.size(); ++i )
 		r[i] = (*this)(r[i]);
 	return r;
