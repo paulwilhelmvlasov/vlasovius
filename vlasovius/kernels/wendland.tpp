@@ -18,7 +18,6 @@
  */
 
 
-
 namespace vlasovius
 {
 
@@ -44,6 +43,7 @@ double wendland<dim,k>::operator()( double r ) const noexcept
 	constexpr size_t N { (dim/2) + 3*k + 2 };
 
 	r = std::abs(r);
+	if ( r >= 1 ) return 0;
 
 	// Clenshaw's algorithm for evaluating Chebyshev expansions.
 	double f      { 4*r - 2 };
@@ -57,9 +57,65 @@ double wendland<dim,k>::operator()( double r ) const noexcept
 	}
 
 	f = 0.5*f;
-	z = std::fma(f,z,c[N-1]) - z_prev;
-	return ( r < 1 ) ? z : 0;
+	return std::fma(f,z,c[N-1]) - z_prev;
 }
+
+#if defined(HAVE_AVX_INSTRUCTIONS) && defined(HAVE_FMA_INSTRUCTIONS)
+
+template <size_t dim, size_t k>
+arma::vec wendland<dim,k>::operator()( arma::vec rvec ) const
+{
+	constexpr size_t N { (dim/2) + 3*k + 2 };
+
+	__m256d cc[N];
+	for ( size_t i = 0; i < N; ++i )
+		cc[i] = _mm256_broadcast_sd( &c[i] );
+
+	__m256d sign_mask  = _mm256_set1_pd(-0.0);
+	__m256d ones       = _mm256_set1_pd( 1.0);
+
+	size_t chunk;
+	for ( chunk = 0; chunk < rvec.size()/4; ++chunk )
+	{
+		__m256d r = _mm256_loadu_pd( rvec.memptr() + 4*chunk );
+		r = _mm256_andnot_pd( sign_mask, r ); // r = abs(r);
+
+		__m256d threshold = _mm256_cmp_pd( r, ones, _CMP_LT_OQ );
+		if ( _mm256_testz_pd(threshold,threshold) )
+		{
+			// if all r >= 1 store zero and continue.
+			_mm256_storeu_pd( rvec.memptr() + 4*chunk,  _mm256_setzero_pd() );
+			continue;
+		}
+
+
+		// Clenshaw algorithm.
+		__m256d fhalf  = _mm256_add_pd(r,r);
+		        fhalf  = _mm256_sub_pd(fhalf,ones);			// f_half = 2*r - 1;
+		__m256d f      = _mm256_add_pd(fhalf,fhalf);		// f      = 4*r - 2;
+		__m256d z_prev = cc[0];
+		__m256d z      = _mm256_fmadd_pd(f,cc[0],cc[1]);	// z = f*c[0] - c[1];
+		for ( size_t i = 2; i < N-1; ++i )
+		{
+			__m256d tmp = _mm256_fmadd_pd(f,z,cc[i]);
+			tmp = _mm256_sub_pd( tmp, z_prev );  // tmp = f*z + c[i] - z_prev;
+			z_prev = z;
+			z      = tmp;
+		}
+		z = _mm256_fmadd_pd(fhalf,z,cc[N-1]);
+		z = _mm256_sub_pd( z, z_prev );
+		z = _mm256_and_pd( z, threshold ); // Set zero if r >= 1.
+		_mm256_storeu_pd( rvec.memptr() + 4*chunk,  z );
+	}
+
+	// Compute the remaining entries in scalar mode.
+	for ( size_t i = 4*chunk; i < rvec.size(); ++i )
+		rvec[i] = (*this)(rvec[i]);
+
+	return rvec;
+}
+
+#else
 
 template <size_t dim, size_t k>
 arma::vec wendland<dim,k>::operator()( arma::vec r ) const
@@ -68,6 +124,8 @@ arma::vec wendland<dim,k>::operator()( arma::vec r ) const
 		r[i] = (*this)(r[i]);
 	return r;
 }
+
+#endif
 
 }
 

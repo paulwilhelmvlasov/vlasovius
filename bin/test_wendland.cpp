@@ -33,12 +33,13 @@ int main( int argc, char* argv[] )
     constexpr size_t dim = 2, k = 4;
     vlasovius::kernels::wendland<dim,k> W;
 
-    arma::vec x( N+1 );
+    arma::vec x( N+1 ), v(N+1);
 	for ( size_t i = 0; i <= N; ++i )
 		x(i) = -1.5 + (3.0/N)*i;
+	v = x;
 
 	stopwatch clock;
-	arma::vec v = W(x);
+	v = W( std::move(v) );
 	double elapsed = clock.elapsed();
 	std::cout << "Time for evaluating: " << elapsed << ".\n";
 
