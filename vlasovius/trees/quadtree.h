@@ -22,6 +22,7 @@
 
 #include <vector>
 #include <deque>
+#include <cmath>
 #include <armadillo>
 
 namespace vlasovius
@@ -55,7 +56,6 @@ namespace vlasovius
 		{
 		public:
 			quadtree(arma::mat& points, size_t minElemPerBox, size_t maxElemPerBox);
-
 
 		private:
 			void buildTree(arma::mat& points, 
