@@ -21,7 +21,7 @@
 
 bool vlasovius::trees::bounding_box_2d::pointInsideAABB(const arma::vec2& x, double tol)
 {
-	return norm(x - center, 2) < tol;
+	return norm(x - center, "inf") < radius + tol ;
 }
 
 void vlasovius::trees::quadtree::buildTree(arma::mat& points, 

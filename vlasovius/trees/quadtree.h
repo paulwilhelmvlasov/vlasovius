@@ -31,7 +31,7 @@ namespace vlasovius
 		struct bounding_box_2d
 		{
 			bool pointInsideAABB(const arma::vec2& x, 
-				double tol = 1e-13);
+				double tol = 1e-16);
 
 			double radius;
 			arma::vec2 center;
