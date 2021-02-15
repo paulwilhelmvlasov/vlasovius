@@ -29,8 +29,8 @@
 int main()
 {
 	constexpr size_t dim { 2 }, k { 4 };
-	constexpr size_t N { 4000 };
-	constexpr double tikhonov_mu { 1e-14 };
+	constexpr size_t N { 10000 };
+	constexpr double tikhonov_mu { 1e-9 };
 	constexpr double twopi { 2*3.1415926535 };
 
 	using wendland_t     = vlasovius::kernels::wendland<dim,k>;
