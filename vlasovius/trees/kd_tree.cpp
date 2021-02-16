@@ -156,5 +156,41 @@ namespace vlasovius
 			nodes[nodes[currentNodeIndex].secondChild].indexLastElem = last - 1;
 		}
 
+		bool bounding_box::contains(const arma::vec& p)
+		{
+			return abs(center - p) <= sidelength;
+		}
+
+		bool node::isLeaf()
+		{
+			return (firstChild < 0);
+			// If children are not set, i.e. == -1,
+			// the node is a leaf.
+		}
+
+		int kd_tree::whichBoxContains(const arma::vec& p) const
+		{
+			if(nodes[0].box.contains(p)){
+				// Trace the tree for the leaf-node containing
+				// the point:
+				int index = 0;
+				do
+				{
+					int firstChild = nodes[index].firstChild;
+					int secondChild = nodes[index].secondChild;
+					if( nodes[firstChild].box.contains(p) ){
+						index = firstChild;
+					} else {
+						index = secondChild;
+					}
+				} while( ! nodes[index].isLeaf() );
+
+				return index;
+			}else{
+				// Passed point is not inside the tree:
+				return -1;
+			}
+		}
+
 	}
 }

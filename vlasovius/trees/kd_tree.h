@@ -38,6 +38,8 @@ namespace vlasovius
 			arma::vec center;
 			arma::vec sidelength; // Distance from center to border
 			// in each direction.
+
+			bool contains(const arma::vec& p);
 		};
 
 		struct node
@@ -51,6 +53,8 @@ namespace vlasovius
 			arma::uword indexLastElem;
 
 			bounding_box box;
+
+			bool isLeaf();
 		};
 
 		template<arma::uword dim> bool compVec
@@ -60,6 +64,9 @@ namespace vlasovius
 		{
 		public:
 			kd_tree(arma::mat& points, size_t minPerBox, size_t maxPerBox);
+
+		public:
+			int whichBoxContains(const arma::vec& p) const;
 
 		private:
 			void buildTree(arma::mat& points, size_t currentNodeIndex, size_t minPerBox, size_t maxPerBox);
