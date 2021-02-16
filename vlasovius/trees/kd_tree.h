@@ -66,7 +66,9 @@ namespace vlasovius
 			kd_tree(arma::mat& points, size_t minPerBox, size_t maxPerBox);
 
 		public:
+			node getNode(size_t i) const;
 			int whichBoxContains(const arma::vec& p) const;
+			int whichBoxContains(size_t i) const;
 
 		private:
 			void buildTree(arma::mat& points, size_t currentNodeIndex, size_t minPerBox, size_t maxPerBox);

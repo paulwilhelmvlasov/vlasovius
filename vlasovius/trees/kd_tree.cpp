@@ -168,6 +168,11 @@ namespace vlasovius
 			// the node is a leaf.
 		}
 
+		node kd_tree::getNode(size_t i) const
+		{
+			return nodes.at(i);
+		}
+
 		int kd_tree::whichBoxContains(const arma::vec& p) const
 		{
 			if(nodes[0].box.contains(p)){
@@ -190,6 +195,32 @@ namespace vlasovius
 				// Passed point is not inside the tree:
 				return -1;
 			}
+		}
+
+		int whichBoxContains(size_t i) const
+		{
+			if(i <= nodes[0].indexLastElem )
+			{
+				// Trace the tree for the leaf-node containing
+				// the point:
+				int index = 0;
+				do
+				{
+					int firstChild = nodes[index].firstChild;
+					int secondChild = nodes[index].secondChild;
+					if( i <= nodes[firstChild].indexLastElem ){
+						index = firstChild;
+					} else {
+						index = secondChild;
+					}
+				} while( ! nodes[index].isLeaf() );
+
+				return index;
+			}else{
+				// Passed point is not inside the tree:
+				return -1;
+			}
+
 		}
 
 	}
