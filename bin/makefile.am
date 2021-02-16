@@ -1,7 +1,10 @@
-noinst_PROGRAMS = test_wendland test_direct_interpolator
+noinst_PROGRAMS = test_wendland test_direct_interpolator direct_vlasov_1d_periodic
 
 test_wendland_SOURCES = test_wendland.cpp
 test_wendland_LDADD = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp
 
 test_direct_interpolator_SOURCES = test_direct_interpolator.cpp
 test_direct_interpolator_LDADD = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp
+
+direct_vlasov_1d_periodic_SOURCES = direct_vlasov_1d_periodic.cpp
+direct_vlasov_1d_periodic_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp

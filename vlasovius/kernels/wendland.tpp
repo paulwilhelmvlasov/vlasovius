@@ -27,14 +27,14 @@ namespace kernels
 namespace wendland_impl
 {
 
-void compute_coefficients( size_t dim, size_t k, double *result );
+void compute_coefficients( size_t dim, size_t k, double *result, double *integral );
 
 }
 
 template <size_t dim, size_t k>
 wendland<dim,k>::wendland()
 {
-	wendland_impl::compute_coefficients( dim, k, c );
+	wendland_impl::compute_coefficients( dim, k, c, &integral_ );
 }
 
 template <size_t dim, size_t k>
@@ -60,7 +60,7 @@ double wendland<dim,k>::operator()( double r ) const noexcept
 	return std::fma(f,z,c[N-1]) - z_prev;
 }
 
-#if defined(HAVE_AVX_INSTRUCTIONS) && defined(HAVE_FMA_INSTRUCTIONS)
+#if defined(HAVE_AVX_INSTRUCTIONS) && defined(HAVE_FMA_INSTRUCTIONS) && defined(__AVX__)
 
 template <size_t dim, size_t k>
 arma::vec wendland<dim,k>::operator()( arma::vec rvec ) const
@@ -128,6 +128,17 @@ arma::vec wendland<dim,k>::operator()( arma::vec r ) const
 }
 
 #endif
+
+
+/*!
+ * \brief Computes the integral of the Wendland function over the positive reals.
+ * \int_{0}^{\infty} W(r)\,{\mathrm dr} = \int_{0}^{1} W(r)\,{\mathrm dr}.
+ */
+template <size_t dim, size_t k> inline
+double wendland<dim,k>::integral() const noexcept
+{
+	return integral_;
+}
 
 }
 
