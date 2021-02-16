@@ -52,8 +52,11 @@ public:
 	double    operator()( double r    ) const noexcept;
 	arma::vec operator()( arma::vec r ) const;
 
+	double integral() const noexcept;
+
 private:
 	double  c [ (dim/2) + 3*k + 2 ];
+	double  integral_;
 };
 
 }
