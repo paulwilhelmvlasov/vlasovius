@@ -149,7 +149,7 @@ int main()
 
 			interpolator_t sfx( K, xv_stage, f, 1e-12 );
 			arma::vec rho = arma::vec(rho_points.n_rows,arma::fill::ones) -
-					        2 * W.integral() * sigma_v * sfx(rho_points);
+					        2 * W.integral() * sigma_v * K.eval_x( rho_points, xv_stage ) * sfx.coeffs();
 			poisson.update_rho( rho );
 
 			for ( size_t i = 0; i < xv_stage.n_rows; ++i )
