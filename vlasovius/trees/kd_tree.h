@@ -23,8 +23,11 @@
 
 
 #include <deque>
-#include <vector>
+#include <algorithm>
+
 #include <armadillo>
+
+#include <vlasovius/misc/row_iter.h>
 
 namespace vlasovius
 {
@@ -44,9 +47,14 @@ namespace vlasovius
 			int firstChild  = -1;
 			int secondChild = -1;
 
+			arma::uword indexFirstElem;
+			arma::uword indexLastElem;
+
 			bounding_box box;
-			std::vector<size_t> point_indices;
 		};
+
+		template<arma::uword dim> bool compVec
+		(const arma::vec& first, const arma::vec& second);
 
 		class kd_tree
 		{
@@ -54,7 +62,7 @@ namespace vlasovius
 			kd_tree(arma::mat& points, size_t minPerBox, size_t maxPerBox);
 
 		private:
-			void buildTree(size_t currentNodeIndex, size_t minPerBox, size_t maxPerBox);
+			void buildTree(arma::mat& points, size_t currentNodeIndex, size_t minPerBox, size_t maxPerBox);
 			size_t splittingDimension(size_t currentNodeIndex);
 			void split(size_t currentNodeIndex, size_t dimSplit);
 

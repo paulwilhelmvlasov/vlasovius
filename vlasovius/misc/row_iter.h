@@ -33,6 +33,11 @@ namespace vlasovius
 			row_iter(arma::mat &A, arma::mat uword) : i(0), A(A) {}
 
 		public:
+			arma::uword getIndex() const
+			{
+				return i;
+			}
+
 			auto operator*() {
 				return A.row(i);
 			}

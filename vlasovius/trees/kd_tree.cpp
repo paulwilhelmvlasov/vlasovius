@@ -24,7 +24,15 @@ namespace vlasovius
 
 	namespace trees
 	{
-		void kd_tree::buildTree(size_t currentNodeIndex, size_t minPerBox, size_t maxPerBox)
+
+		template<arma::uword dim> bool compVec
+		(const arma::vec& first, const arma::vec& second)
+		{
+			return (first(dim) < second(dim));
+		}
+
+
+		void kd_tree::buildTree(arma::mat& points, size_t currentNodeIndex, size_t minPerBox, size_t maxPerBox)
 		{
 			// Use the standard splitting rule for kd-trees, i.e.:
 			// The split-dimension is the one with maximum spread
@@ -52,7 +60,10 @@ namespace vlasovius
 				// Compute splitting dimension:
 				size_t dimSplit = splittingDimension(currentNodeIndex);
 
-				// Compute splitting value:
+				// Split along the dimension at the correct value:
+				split(points, currentNodeIndex, dimSplit);
+
+				// Compute boxes for children:
 			}
 		}
 
@@ -84,9 +95,21 @@ namespace vlasovius
 			}
 		}
 
-		void kd_tree::split(size_t currentNodeIndex, size_t dimSplit)
+		void kd_tree::split(arma::mat& points, size_t currentNodeIndex, size_t dimSplit)
 		{
+			arma::uword first = nodes[currentNodeIndex].indexFirstElem;
+			arma::uword last  = nodes[currentNodeIndex].indexLastElem;
+			arma::uword nth = (last - first) / 2;
+			std::nth_element(row_iter(points, first),
+					row_iter(points, nth),
+					row_iter(points, last),
+					compVec<dimSplit>);
 
+			nodes[nodes[currentNodeIndex].firstChild].indexFirstElem = first;
+			nodes[nodes[currentNodeIndex].firstChild].indexLastElem = nth;
+
+			nodes[nodes[currentNodeIndex].secondChild].indexFirstElem = nth + 1;
+			nodes[nodes[currentNodeIndex].secondChild].indexLastElem = last;
 		}
 
 	}
