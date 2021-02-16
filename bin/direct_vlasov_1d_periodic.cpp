@@ -20,6 +20,7 @@
 #include <iostream>
 #include <armadillo>
 
+#include <vlasovius/misc/stopwatch.h>
 #include <vlasovius/kernels/wendland.h>
 #include <vlasovius/kernels/rbf_kernel.h>
 #include <vlasovius/kernels/periodised_kernel.h>
@@ -138,6 +139,7 @@ int main()
 	while ( t < T )
 	{
 		std::cout << "t = " << t << ". "; std::cout.flush();
+		vlasovius::misc::stopwatch clock;
 		for ( size_t stage = 0; stage < 4; ++stage )
 		{
 			arma::mat xv_stage = xv;
@@ -162,6 +164,9 @@ int main()
 		for ( size_t s = 0; s < 4; ++s )
 			xv += dt*d_rk4[s]*k_xv[s];
 		t += dt;
+
+		double elapsed = clock.elapsed();
+		std::cout << "Time for needed for time-step: " << elapsed << ".\n";
 
 		if ( t + dt > T ) dt = T - t;
 	}
