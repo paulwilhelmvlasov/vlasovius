@@ -31,6 +31,31 @@ namespace vlasovius
 			return (first(dim) < second(dim));
 		}
 
+		kd_tree::kd_tree(arma::mat& points, size_t minPerBox, size_t maxPerBox)
+		{
+			// Init first node:
+			nodes.push_back();
+			nodes[0].indexFirstElem = 0;
+			nodes[0].indexLastElem  = points.n_rows;
+
+			nodes[0].box.center     = points.row(0);
+			nodes[0].box.sidelegnth = points.row(0);
+
+			arma::uword dim = points.n_cols;
+
+			// Compute its bounding box:
+			for(arma::uword i = 0; i < dim; i++){
+				double min 		  = points.col(i).min();
+				double max 		  = points.col(i).max();
+				double sidelength = (max - min) / 2.0;
+
+				nodes[0].box.sidelength(i) = sidelength;
+				nodes[0].box.center(i)     = max - sidelength;
+			}
+
+			buildTree(points, 0, minPerBox, maxPerBox);
+		}
+
 
 		void kd_tree::buildTree(arma::mat& points, size_t currentNodeIndex, size_t minPerBox, size_t maxPerBox)
 		{
@@ -48,13 +73,13 @@ namespace vlasovius
 				nodes.push_back(node());
 				nodes.push_back(node());
 
-				size_t firstChild = nodes.size() - 2;
+				size_t firstChild  = nodes.size() - 2;
 				size_t secondChild = nodes.size() - 1;
 
-				nodes[currentNodeIndex].firstChild = firstChild;
+				nodes[currentNodeIndex].firstChild  = firstChild;
 				nodes[currentNodeIndex].secondChild = secondChild;
 
-				nodes[firstChild].parent = currentNodeIndex;
+				nodes[firstChild].parent  = currentNodeIndex;
 				nodes[secondChild].parent = currentNodeIndex;
 
 				// Compute splitting dimension:
@@ -64,6 +89,25 @@ namespace vlasovius
 				split(points, currentNodeIndex, dimSplit);
 
 				// Compute boxes for children:
+				nodes[firstChild].box  = nodes[currentNodeIndex].box;
+				nodes[sceondChild].box = nodes[currentNodeIndex].box;
+
+				double lowerBorder = points.row(nodes[firstChild].indexFirstElem)(dimSplit);
+				double splitValue  = points.row(nodes[firstChild].indexLastElem)(dimSplit);
+				double upperBorder = points.row(nodes[secondChild].indexLastElem)(dimSplit);
+
+				double firstSideLength  = (splitValue - lowerBorder) / 2.0;
+				double secondSideLength = (upperBorder - splitValue) / 2.0;
+
+				nodes[firstChild].box.sidelength(dimSplit)  = firstSideLength;
+				nodes[secondChild].box.sidelength(dimSplit) = secondSideLength;
+
+				nodes[firstChild].box.center(dimSplit) -= firstSideLegnth;
+				nodes[secondChild].box.center(dimSplit) -= secondSideLegnth;
+
+				// Start recursion for children:
+				buildTree(points, firstChild, minPerBox, maxPerBox);
+				buildTree(points, secondChild, minPerBox, maxPerBox);
 			}
 		}
 
@@ -98,7 +142,7 @@ namespace vlasovius
 		void kd_tree::split(arma::mat& points, size_t currentNodeIndex, size_t dimSplit)
 		{
 			arma::uword first = nodes[currentNodeIndex].indexFirstElem;
-			arma::uword last  = nodes[currentNodeIndex].indexLastElem;
+			arma::uword last  = nodes[currentNodeIndex].indexLastElem + 1;
 			arma::uword nth = (last - first) / 2;
 			std::nth_element(row_iter(points, first),
 					row_iter(points, nth),
@@ -109,7 +153,7 @@ namespace vlasovius
 			nodes[nodes[currentNodeIndex].firstChild].indexLastElem = nth;
 
 			nodes[nodes[currentNodeIndex].secondChild].indexFirstElem = nth + 1;
-			nodes[nodes[currentNodeIndex].secondChild].indexLastElem = last;
+			nodes[nodes[currentNodeIndex].secondChild].indexLastElem = last - 1;
 		}
 
 	}
