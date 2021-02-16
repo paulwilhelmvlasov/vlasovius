@@ -22,6 +22,7 @@
 #define VLASOVIUS_TREES_KD_TREE_H
 
 
+#include <deque>
 #include <vector>
 #include <armadillo>
 
@@ -29,15 +30,39 @@ namespace vlasovius
 {
 	namespace trees
 	{
+		struct bounding_box
+		{
+			arma::vec center;
+			arma::vec sidelength; // Distance from center to border
+			// in each direction.
+		};
 
+		struct node
+		{
+			int parent 		= -1;
 
+			int firstChild  = -1;
+			int secondChild = -1;
+
+			bounding_box box;
+			std::vector<size_t> point_indices;
+		};
 
 		class kd_tree
 		{
 		public:
-			kd_tree(arma::mat& points);
+			kd_tree(arma::mat& points, size_t minPerBox, size_t maxPerBox);
 
+		private:
+			void buildTree(size_t currentNodeIndex, size_t minPerBox, size_t maxPerBox);
+			size_t splittingDimension(size_t currentNodeIndex);
+			void split(size_t currentNodeIndex, size_t dimSplit);
 
+		private:
+			size_t dim = 0;
+
+			std::deque<node> nodes; // deque to avoid reallocating the underlying array several times
+			// as the struct node might potentially be a large datatype.
 		};
 
 	}
