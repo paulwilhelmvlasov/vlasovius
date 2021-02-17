@@ -39,7 +39,7 @@ namespace vlasovius
 			arma::vec sidelength; // Distance from center to border
 			// in each direction.
 
-			bool contains(const arma::vec& p);
+			bool contains(const arma::vec& p) const;
 		};
 
 		struct node
@@ -54,7 +54,7 @@ namespace vlasovius
 
 			bounding_box box;
 
-			bool isLeaf();
+			bool isLeaf() const;
 		};
 
 		template<arma::uword dim> bool compVec
@@ -66,6 +66,7 @@ namespace vlasovius
 			kd_tree(arma::mat& points, size_t minPerBox, size_t maxPerBox);
 
 		public:
+			size_t getNumberLeafs() const;
 			node getNode(size_t i) const;
 			int whichBoxContains(const arma::vec& p) const;
 			int whichBoxContains(size_t i) const;
@@ -73,10 +74,11 @@ namespace vlasovius
 		private:
 			void buildTree(arma::mat& points, size_t currentNodeIndex, size_t minPerBox, size_t maxPerBox);
 			size_t splittingDimension(size_t currentNodeIndex);
-			void split(size_t currentNodeIndex, size_t dimSplit);
+			void split(arma::mat& points, size_t currentNodeIndex, size_t dimSplit);
 
 		private:
-			size_t dim = 0;
+			arma::uword dim = 0;
+			size_t n_leafs = 0;
 
 			std::deque<node> nodes; // deque to avoid reallocating the underlying array several times
 			// as the struct node might potentially be a large datatype.

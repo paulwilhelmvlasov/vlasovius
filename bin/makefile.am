@@ -1,7 +1,11 @@
-noinst_PROGRAMS = test_wendland test_direct_interpolator
+noinst_PROGRAMS = test_wendland test_direct_interpolator test_kd_tree
 
 test_wendland_SOURCES = test_wendland.cpp
 test_wendland_LDADD = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp
 
 test_direct_interpolator_SOURCES = test_direct_interpolator.cpp
 test_direct_interpolator_LDADD = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp
+
+test_kd_tree_SOURCES = test_kd_tree.cpp
+test_kd_tree_LDADD = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp
+

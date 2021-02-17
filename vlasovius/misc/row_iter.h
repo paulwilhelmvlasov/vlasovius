@@ -20,6 +20,8 @@
 #ifndef VLASOVIUS_MISC_ROW_ITER_H_
 #define VLASOVIUS_MISC_ROW_ITER_H_
 
+#include <iterator>
+
 #include <armadillo>
 
 namespace vlasovius
@@ -27,17 +29,21 @@ namespace vlasovius
 
 	namespace misc
 	{
-		class row_iter
+		class row_iter : public std::iterator
+		<std::random_access_iterator_tag, arma::vec>
 		{
 		public:
-			row_iter(arma::mat &A, arma::mat uword) : i(0), A(A) {}
+			row_iter(arma::mat &A, arma::uword i)
+			: i(i), A(A) {}
 
 		public:
+
 			arma::uword getIndex() const
 			{
 				return i;
 			}
 
+			// Pointer-operators:
 			auto operator*() {
 				return A.row(i);
 			}
@@ -46,16 +52,28 @@ namespace vlasovius
 				return A.row(i);
 			}
 
-			row_iter operator++() {
+			// Increment/Decrement operators:
+			row_iter operator++(int) {
 				i++;
 				return *this;
 			}
 
-			row_iter operator--() {
+			row_iter& operator++(){
+				i++;
+				return *this;
+			}
+
+			row_iter operator--(int) {
 				i--;
 				return *this;
 			}
 
+			row_iter& operator--(){
+				i--;
+				return *this;
+			}
+
+			// Addition/Subtraction operators:
 			row_iter operator+=(const row_iter& rhs) {
 				i += rhs.i;
 				return *this;
@@ -66,56 +84,56 @@ namespace vlasovius
 				return *this;
 			}
 
-			row_iter operator+(row_iter left, const row_iter& right){
-				left += right;
-				return left;
+			row_iter operator+(const row_iter& right){
+				i += right.i;
+				return *this;
 			}
 
-			row_iter operator-(row_iter left, const row_iter& right){
-							left -= right;
-							return left;
+			row_iter operator-(const row_iter& right){
+				i -= right.i;
+				return *this;
 			}
 
+			row_iter operator+(arma::uword n) {
+				i += n;
+				return *this;
+			}
+
+			row_iter operator-(arma::uword n) {
+				i -= n;
+				return *this;
+			}
+
+			// Direct access:
 			auto operator[](arma::uword j){
 				return A.row(j);
 			}
 
-			bool operator<(const row_iter& lhs, const row_iter& rhs){
-				return (lhs.i < rhs.i);
+			// Comparison-operators:
+			bool operator<(const row_iter& rhs){
+				return (i < rhs.i);
 			}
 
-			bool operator>(const row_iter& lhs, const row_iter& rhs){
-				return rhs < lhs;
+			bool operator>(const row_iter& rhs){
+				return rhs.i < i;
 			}
 
-			bool operator<=(const row_iter& lhs, const row_iter& rhs){
-				return !(lhs > rhs);
+			bool operator<=(const row_iter& rhs){
+				return !(i > rhs.i);
 			}
 
-			bool operator>=(const row_iter& lhs, const row_iter& rhs){
-				return !(lhs < rhs);
+			bool operator>=(const row_iter& rhs){
+				return !(i < rhs.i);
 			}
 
-			row_iter operator+(row_iter it, arma::uword n) {
-				it.i += n;
-				return it;
+
+			bool operator== (const row_iter& iter) {
+				return (i == iter.i);
 			}
 
-			row_iter operator-(row_iter it, arma::uword n) {
-				it.i -= n;
-				return it;
+			bool operator!= (const row_iter& iter) {
+				return !(*this == iter);
 			}
-
-			row_iter operator+(arma::uword n, row_iter it) {
-				it.i += n;
-				return it;
-			}
-
-			row_iter operator-(arma::uword n, row_iter it) {
-				it.i -= n;
-				return it;
-			}
-
 
 
 		private:

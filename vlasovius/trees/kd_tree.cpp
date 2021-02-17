@@ -34,14 +34,14 @@ namespace vlasovius
 		kd_tree::kd_tree(arma::mat& points, size_t minPerBox, size_t maxPerBox)
 		{
 			// Init first node:
-			nodes.push_back();
+			nodes.push_back(node());
 			nodes[0].indexFirstElem = 0;
 			nodes[0].indexLastElem  = points.n_rows;
 
 			nodes[0].box.center     = points.row(0);
-			nodes[0].box.sidelegnth = points.row(0);
+			nodes[0].box.sidelength = points.row(0);
 
-			arma::uword dim = points.n_cols;
+			dim = points.n_cols;
 
 			// Compute its bounding box:
 			for(arma::uword i = 0; i < dim; i++){
@@ -53,6 +53,7 @@ namespace vlasovius
 				nodes[0].box.center(i)     = max - sidelength;
 			}
 
+			n_leafs = 1; // Starting with 1 leaf.
 			buildTree(points, 0, minPerBox, maxPerBox);
 		}
 
@@ -65,7 +66,8 @@ namespace vlasovius
 			// the respective coordinates of the points in the
 			// current box.
 
-			size_t numIndicesInBox = nodes[currentNodeIndex].point_indices.size();
+			size_t numIndicesInBox = nodes[currentNodeIndex].indexLastElem
+					- nodes[currentNodeIndex].indexFirstElem;
 			if(numIndicesInBox > maxPerBox && (numIndicesInBox / 2) >= minPerBox){
 				// In this case split the node:
 
@@ -90,7 +92,7 @@ namespace vlasovius
 
 				// Compute boxes for children:
 				nodes[firstChild].box  = nodes[currentNodeIndex].box;
-				nodes[sceondChild].box = nodes[currentNodeIndex].box;
+				nodes[secondChild].box = nodes[currentNodeIndex].box;
 
 				double lowerBorder = points.row(nodes[firstChild].indexFirstElem)(dimSplit);
 				double splitValue  = points.row(nodes[firstChild].indexLastElem)(dimSplit);
@@ -102,10 +104,11 @@ namespace vlasovius
 				nodes[firstChild].box.sidelength(dimSplit)  = firstSideLength;
 				nodes[secondChild].box.sidelength(dimSplit) = secondSideLength;
 
-				nodes[firstChild].box.center(dimSplit) -= firstSideLegnth;
-				nodes[secondChild].box.center(dimSplit) -= secondSideLegnth;
+				nodes[firstChild].box.center(dimSplit) -= firstSideLength;
+				nodes[secondChild].box.center(dimSplit) -= secondSideLength;
 
 				// Start recursion for children:
+				n_leafs++; // 1 leaf-node split into 2 leafs => Increment leaf-count.
 				buildTree(points, firstChild, minPerBox, maxPerBox);
 				buildTree(points, secondChild, minPerBox, maxPerBox);
 			}
@@ -141,13 +144,19 @@ namespace vlasovius
 
 		void kd_tree::split(arma::mat& points, size_t currentNodeIndex, size_t dimSplit)
 		{
+			using vlasovius::misc::row_iter;
 			arma::uword first = nodes[currentNodeIndex].indexFirstElem;
 			arma::uword last  = nodes[currentNodeIndex].indexLastElem + 1;
 			arma::uword nth = (last - first) / 2;
+
 			std::nth_element(row_iter(points, first),
 					row_iter(points, nth),
 					row_iter(points, last),
-					compVec<dimSplit>);
+					[&dimSplit](const arma::vec& first, const arma::vec& second)->bool
+					{
+									return first(dimSplit) < second(dimSplit);
+					}
+			);
 
 			nodes[nodes[currentNodeIndex].firstChild].indexFirstElem = first;
 			nodes[nodes[currentNodeIndex].firstChild].indexLastElem = nth;
@@ -156,16 +165,21 @@ namespace vlasovius
 			nodes[nodes[currentNodeIndex].secondChild].indexLastElem = last - 1;
 		}
 
-		bool bounding_box::contains(const arma::vec& p)
+		bool bounding_box::contains(const arma::vec& p) const
 		{
-			return abs(center - p) <= sidelength;
+			return arma::approx_equal( abs(center - p), sidelength, "reldiff", 1e-16);
 		}
 
-		bool node::isLeaf()
+		bool node::isLeaf() const
 		{
 			return (firstChild < 0);
 			// If children are not set, i.e. == -1,
 			// the node is a leaf.
+		}
+
+		size_t kd_tree::getNumberLeafs() const
+		{
+			return n_leafs;
 		}
 
 		node kd_tree::getNode(size_t i) const
@@ -197,7 +211,7 @@ namespace vlasovius
 			}
 		}
 
-		int whichBoxContains(size_t i) const
+		int kd_tree::whichBoxContains(size_t i) const
 		{
 			if(i <= nodes[0].indexLastElem )
 			{
