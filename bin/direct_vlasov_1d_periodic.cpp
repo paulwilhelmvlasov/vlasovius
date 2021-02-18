@@ -20,7 +20,6 @@
 #include <iostream>
 #include <armadillo>
 
-#include <vlasovius/misc/openmp.h>
 #include <vlasovius/misc/stopwatch.h>
 #include <vlasovius/kernels/wendland.h>
 #include <vlasovius/kernels/rbf_kernel.h>
