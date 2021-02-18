@@ -72,6 +72,7 @@ namespace vlasovius
 			int whichBoxContains(size_t i) const;
 
 		private:
+			bounding_box computeBox(arma::mat& points);
 			void sortPoints(std::vector<arma::uword>& sortedIndices,
 					arma::mat& points);
 			void buildTree(std::vector<arma::uword>& sortedIndices,

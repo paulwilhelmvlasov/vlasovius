@@ -20,13 +20,6 @@
 #include "vlasovius/trees/kd_tree.h"
 
 
-void swap(arma::mat::col_iterator& lhs, arma::mat::col_iterator& rhs)
-{
-	lhs->M->swap_rows(lhs->current_row, rhs->current_row); // Das geht nicht, weil fuckin
-	// col_iterator kein beschissener Iterator, sondern ein fuckin pointer ist....
-}
-
-
 namespace vlasovius
 {
 
@@ -41,35 +34,52 @@ namespace vlasovius
 
 		kd_tree::kd_tree(arma::mat& points, size_t minPerBox, size_t maxPerBox)
 		{
+			// Set dimension of points:
+			dim = points.n_cols;
+
 			// Init first node:
 			nodes.push_back(node());
 			nodes[0].indexFirstElem = 0;
 			nodes[0].indexLastElem  = points.n_rows;
 
-			nodes[0].box.center     = points.row(0);
-			nodes[0].box.sidelength = points.row(0);
+			nodes[0].box = computeBox(points);
 
-			dim = points.n_cols;
-
-			// Compute its bounding box:
-			for(arma::uword i = 0; i < dim; i++){
-				double min 		  = points.col(i).min();
-				double max 		  = points.col(i).max();
-				double sidelength = (max - min) / 2.0;
-
-				nodes[0].box.sidelength(i) = sidelength;
-				nodes[0].box.center(i)     = max - sidelength;
-			}
-
-			n_leafs = 1; // Starting with 1 leaf.
+			n_leafs = 1;
 
 			std::vector<arma::uword> sortedIndices(points.n_rows);
-			// Fill index-list with 0..N:
 			std::iota(sortedIndices.begin(), sortedIndices.end(), 0);
 
 			buildTree(sortedIndices, points, 0, minPerBox, maxPerBox);
 
 			sortPoints(sortedIndices, points);
+		}
+
+		bounding_box kd_tree::computeBox(arma::mat& points)
+		{
+			bounding_box box;
+			box.center 		= points.row(0);
+			box.sidelength  = points.row(0);
+
+			for(arma::uword i = 0; i < dim; i++){
+				double min 		  = points.col(i).min();
+				double max 		  = points.col(i).max();
+				double sidelength = (max - min) / 2.0;
+
+				box.sidelength(i) = sidelength;
+				box.center(i)     = max - sidelength;
+			}
+
+			return box;
+		}
+
+		void kd_tree::sortPoints(std::vector<arma::uword>& sortedIndices,
+							arma::mat& points)
+		{
+			arma::mat copy(points);
+			#pragma omp parallel for
+			for(long i = 0; i < sortedIndices.size(); i++){
+				points.row(i) = copy.row(sortedIndices[i]);
+			}
 		}
 
 
@@ -126,8 +136,8 @@ namespace vlasovius
 
 				// Start recursion for children:
 				n_leafs++; // 1 leaf-node split into 2 leafs => Increment leaf-count.
-				buildTree(points, firstChild, minPerBox, maxPerBox);
-				buildTree(points, secondChild, minPerBox, maxPerBox);
+				buildTree(sortedIndices, points, firstChild, minPerBox, maxPerBox);
+				buildTree(sortedIndices, points, secondChild, minPerBox, maxPerBox);
 			}
 		}
 
@@ -170,13 +180,13 @@ namespace vlasovius
 			arma::uword nth = (last - first) / 2;
 
 			auto comp = [&](arma::uword i, arma::uword j)->bool {
-
+				return points(i, dimSplit) < points(j, dimSplit);
 			};
-			/*std::nth_element(row_iter(points, first),
-					row_iter(points, nth),
-					row_iter(points, last),
-					compVec<dimSplit>);
-					*/
+
+			std::nth_element(sortedIndices.begin() + first,
+					sortedIndices.begin() + nth,
+					sortedIndices.begin() + last,
+					comp);
 
 			nodes[nodes[currentNodeIndex].firstChild].indexFirstElem = first;
 			nodes[nodes[currentNodeIndex].firstChild].indexLastElem = nth;
