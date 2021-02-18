@@ -32,3 +32,4 @@ m4/lt*.m4
 /compile
 bin/test_wendland.exe.stackdump
 bin/test_wendland.txt
+/build/
