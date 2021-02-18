@@ -72,9 +72,15 @@ namespace vlasovius
 			int whichBoxContains(size_t i) const;
 
 		private:
-			void buildTree(arma::mat& points, size_t currentNodeIndex, size_t minPerBox, size_t maxPerBox);
+			void sortPoints(std::vector<arma::uword>& sortedIndices,
+					arma::mat& points);
+			void buildTree(std::vector<arma::uword>& sortedIndices,
+					arma::mat& points, size_t currentNodeIndex,
+					size_t minPerBox, size_t maxPerBox);
 			size_t splittingDimension(size_t currentNodeIndex);
-			void split(arma::mat& points, size_t currentNodeIndex, size_t dimSplit);
+			void split(std::vector<arma::uword>& sortedIndices,
+					arma::mat& points, size_t currentNodeIndex,
+					size_t dimSplit);
 
 		private:
 			arma::uword dim = 0;

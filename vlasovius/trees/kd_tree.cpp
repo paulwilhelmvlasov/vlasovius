@@ -62,11 +62,20 @@ namespace vlasovius
 			}
 
 			n_leafs = 1; // Starting with 1 leaf.
-			buildTree(points, 0, minPerBox, maxPerBox);
+
+			std::vector<arma::uword> sortedIndices(points.n_rows);
+			// Fill index-list with 0..N:
+			std::iota(sortedIndices.begin(), sortedIndices.end(), 0);
+
+			buildTree(sortedIndices, points, 0, minPerBox, maxPerBox);
+
+			sortPoints(sortedIndices, points);
 		}
 
 
-		void kd_tree::buildTree(arma::mat& points, size_t currentNodeIndex, size_t minPerBox, size_t maxPerBox)
+		void kd_tree::buildTree(std::vector<arma::uword>& sortedIndices,
+				arma::mat& points, size_t currentNodeIndex,
+				size_t minPerBox, size_t maxPerBox)
 		{
 			// Use the standard splitting rule for kd-trees, i.e.:
 			// The split-dimension is the one with maximum spread
@@ -96,7 +105,7 @@ namespace vlasovius
 				size_t dimSplit = splittingDimension(currentNodeIndex);
 
 				// Split along the dimension at the correct value:
-				split(points, currentNodeIndex, dimSplit);
+				split(sortedIndices, points, currentNodeIndex, dimSplit);
 
 				// Compute boxes for children:
 				nodes[firstChild].box  = nodes[currentNodeIndex].box;
@@ -150,7 +159,8 @@ namespace vlasovius
 			}
 		}
 
-		void kd_tree::split(arma::mat& points, size_t currentNodeIndex, size_t dimSplit)
+		void kd_tree::split(std::vector<arma::uword>& sortedIndices,
+				arma::mat& points, size_t currentNodeIndex, size_t dimSplit)
 		{
 			//using vlasovius::misc::random_access_iterator;
 			//typedef random_access_iterator row_iter;
@@ -159,15 +169,14 @@ namespace vlasovius
 			arma::uword last  = nodes[currentNodeIndex].indexLastElem + 1;
 			arma::uword nth = (last - first) / 2;
 
+			auto comp = [&](arma::uword i, arma::uword j)->bool {
+
+			};
 			/*std::nth_element(row_iter(points, first),
 					row_iter(points, nth),
 					row_iter(points, last),
-					[&dimSplit](const arma::vec& first, const arma::vec& second)->bool
-					{
-									return first(dimSplit) < second(dimSplit);
-					}
-			);*/
-			std::nth_element(points.begin_col(first), points.begin_col(nth), points.begin_col(last));
+					compVec<dimSplit>);
+					*/
 
 			nodes[nodes[currentNodeIndex].firstChild].indexFirstElem = first;
 			nodes[nodes[currentNodeIndex].firstChild].indexLastElem = nth;
