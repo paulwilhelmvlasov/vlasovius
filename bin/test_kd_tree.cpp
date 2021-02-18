@@ -25,13 +25,6 @@ int main()
 {
 	arma::mat points(10, 2, arma::fill::randu);
 
-	vlasovius::misc::row_iter it(points, 0);
-
-	for(int i = 0; i < 10; i++){
-		it++;
-		std::cout << it.getIndex() << std::endl;
-	}
-
 	vlasovius::trees::kd_tree baum(points, 1, 2);
 	std::cout << "Number leafs: " << baum.getNumberLeafs() << std::endl;
 

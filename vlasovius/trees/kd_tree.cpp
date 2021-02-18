@@ -19,6 +19,14 @@
 
 #include "vlasovius/trees/kd_tree.h"
 
+
+void swap(arma::mat::col_iterator& lhs, arma::mat::col_iterator& rhs)
+{
+	lhs->M->swap_rows(lhs->current_row, rhs->current_row); // Das geht nicht, weil fuckin
+	// col_iterator kein beschissener Iterator, sondern ein fuckin pointer ist....
+}
+
+
 namespace vlasovius
 {
 
@@ -144,19 +152,22 @@ namespace vlasovius
 
 		void kd_tree::split(arma::mat& points, size_t currentNodeIndex, size_t dimSplit)
 		{
-			using vlasovius::misc::row_iter;
+			//using vlasovius::misc::random_access_iterator;
+			//typedef random_access_iterator row_iter;
+
 			arma::uword first = nodes[currentNodeIndex].indexFirstElem;
 			arma::uword last  = nodes[currentNodeIndex].indexLastElem + 1;
 			arma::uword nth = (last - first) / 2;
 
-			std::nth_element(row_iter(points, first),
+			/*std::nth_element(row_iter(points, first),
 					row_iter(points, nth),
 					row_iter(points, last),
 					[&dimSplit](const arma::vec& first, const arma::vec& second)->bool
 					{
 									return first(dimSplit) < second(dimSplit);
 					}
-			);
+			);*/
+			std::nth_element(points.begin_col(first), points.begin_col(nth), points.begin_col(last));
 
 			nodes[nodes[currentNodeIndex].firstChild].indexFirstElem = first;
 			nodes[nodes[currentNodeIndex].firstChild].indexLastElem = nth;

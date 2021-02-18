@@ -27,7 +27,7 @@
 
 #include <armadillo>
 
-#include <vlasovius/misc/row_iter.h>
+// #include <vlasovius/misc/row_iter.h>
 
 namespace vlasovius
 {
