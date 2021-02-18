@@ -17,6 +17,8 @@
  * vlasovius; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
 
+#include <immintrin.h>
+
 namespace vlasovius
 {
 
@@ -37,30 +39,71 @@ arma::mat rbf_kernel<rbf_function>::operator()( const arma::mat &X,
 		throw std::logic_error { "vlasovius::kernels::rbf_kernel::operator(): "
 			                     "X and Y contain points of differing dimension." };
 	}
-
-	size_t dim { X.n_cols };
-	size_t N { X.n_rows }, M { Y.n_rows };
-
-	arma::vec ones( dim, arma::fill::ones );
-	arma::vec vx = (X%X) * ones;
-	arma::vec vy = (Y%Y) * ones;
-
-	arma::mat result = -2*X*Y.t();
-	for ( size_t i = 0; i < N; ++i )
-		result.row(i) += vy.t();
-	for ( size_t j = 0; j < M; ++j )
-		result.col(j) += vx;
-
-	result = inv_sigma*sqrt(abs(result));
-
-
-	// Interpretation of result matrix as vector.
-	arma::vec result_vec( result.memptr(), N*M, false, true );
-
-	// Make use of vectorised RBF-kernel.
-	result_vec = F( std::move(result_vec) );
-
+	const size_t N { X.n_rows }, M { Y.n_rows }, dim { Y.n_cols };
+	arma::mat result( N, M );
+	eval( dim, N, M, result.memptr(), N, X.memptr(), dim, Y.memptr(), dim );
 	return result;
+
+}
+
+template <typename rbf_function>
+void rbf_kernel<rbf_function>::eval( size_t dim, size_t n, size_t m,
+		                             double *__restrict__ K, size_t ldK,
+		                             const double        *X, size_t ldX,
+									 const double        *Y, size_t ldY ) const
+{
+	using simd_t = ::vlasovius::misc::simd<double>;
+
+	#pragma omp parallel for
+	for ( size_t j = 0; j < m; ++j )
+	{
+		size_t i = 0;
+
+		if constexpr ( simd_t::size() > 1 )
+		{
+			simd_t x, y, r;
+			y.fill(Y + j);
+			for ( ; i + simd_t::size() < n; i += simd_t::size()  )
+			{
+				x.load(X + i);
+				simd_t r = abs(x-y);
+
+				if ( dim > 1 )
+				{
+					r = r*r;
+					for ( size_t d = 1; d < dim; ++d )
+					{
+						x.load(X + i + d*ldX);
+						y.fill(X + j + d*ldY);
+						r = fmadd(x-y,x-y,r);
+					}
+					r = sqrt(r);
+				}
+				r = F(r*inv_sigma);
+				r.store( K + i + j*ldK );
+			}
+		}
+
+		for ( ; i < n; ++i )
+		{
+			double x = X[i];
+			double y = Y[j];
+			double r = std::abs(x-y);
+
+			if ( dim > 1 )
+			{
+				r = r*r;
+				for ( size_t d = 1; d < dim; ++d )
+				{
+					x = X[ i + d*ldX ];
+					y = Y[ j + d*ldY ];
+					r = std::fma(x-y,x-y,r);
+				}
+				r = sqrt(r);
+			}
+			K[ i + j*ldK ] = F(r*inv_sigma);
+		}
+	}
 }
 
 }

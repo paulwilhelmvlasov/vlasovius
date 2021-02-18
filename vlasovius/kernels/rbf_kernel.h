@@ -20,6 +20,7 @@
 #define VLASOVIUS_KERNELS_RBF_KERNEL_H
 
 #include <armadillo>
+#include <vlasovius/misc/simd.h>
 
 namespace vlasovius
 {
@@ -34,6 +35,17 @@ public:
 	rbf_kernel( rbf_function p_F = rbf_function {}, double sigma = 1 );
 
 	arma::mat operator()( const arma::mat &X, const arma::mat &Y ) const;
+
+
+	void eval( size_t dim, size_t n, size_t m,
+			   double *__restrict__ K, size_t ldK,
+	           const double        *X, size_t ldX,
+	           const double        *Y, size_t ldY ) const;
+
+	static constexpr size_t BLOCK_SIZE { 4 };
+	void block_eval( double *result,
+			         const arma::mat &X, size_t x_row,
+					 const arma::mat &Y, size_t y_row ) const;
 
 private:
 	rbf_function F   {};

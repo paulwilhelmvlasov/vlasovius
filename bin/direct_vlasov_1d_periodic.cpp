@@ -20,6 +20,7 @@
 #include <iostream>
 #include <armadillo>
 
+#include <vlasovius/misc/openmp.h>
 #include <vlasovius/misc/stopwatch.h>
 #include <vlasovius/kernels/wendland.h>
 #include <vlasovius/kernels/rbf_kernel.h>
@@ -55,7 +56,7 @@ private:
 
 template <size_t k>
 xv_kernel<k>::xv_kernel( double sigma_x, double sigma_v, double L ):
-Kx { wendland { rbf_wendland {}, sigma_x }, L, (size_t) (L/sigma_v) },
+Kx { wendland { rbf_wendland {}, sigma_x }, L, (size_t) std::ceil(sigma_v/L) },
 Kv { rbf_wendland {}, sigma_v }
 {}
 
@@ -90,7 +91,7 @@ int main()
 	using wendland_t = vlasovius::kernels::wendland<1,order>;
 	wendland_t W;
 
-	double sigma_x = 4, sigma_v = 4, L = 4*3.14159265358979323846;
+	double L = 4*3.14159265358979323846, sigma_x  = L/2, sigma_v = 2;
 	kernel_t K( sigma_x, sigma_v, L );
 
 
@@ -135,7 +136,8 @@ int main()
 	}
 
 	size_t plot_count = 0;
-	double t = 0, T = 20, dt = 1./16.;
+	double t = 0, T = 50, dt = 1./16.;
+	std::ofstream str("E.txt");
 	while ( t < T )
 	{
 		std::cout << "t = " << t << ". "; std::cout.flush();
@@ -149,7 +151,7 @@ int main()
 			k_xv[ stage ].resize( xv.n_rows, xv.n_cols );
 			k_xv[ stage ].col(0) = xv_stage.col(1);
 
-			interpolator_t sfx( K, xv_stage, f, 1e-12 );
+			interpolator_t sfx( K, xv_stage, f, 1e-14 );
 			arma::vec rho = arma::vec(rho_points.n_rows,arma::fill::ones) -
 					        2 * W.integral() * sigma_v * K.eval_x( rho_points, xv_stage ) * sfx.coeffs();
 			poisson.update_rho( rho );
@@ -158,7 +160,10 @@ int main()
 				k_xv[stage](i,1) = -poisson.E( xv_stage(i,0) );
 
 			if ( stage == 0 )
+			{
+				str << t << " " << norm( k_xv[stage].col(1), "inf" ) << std::endl;
 				std::cout << "E-max: " << norm( k_xv[stage].col(1), "inf" ) << "." << std::endl;
+			}
  		}
 
 		for ( size_t s = 0; s < 4; ++s )

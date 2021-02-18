@@ -19,6 +19,8 @@
 
 #include <lapacke.h>
 
+#include <vlasovius/misc/stopwatch.h>
+
 namespace vlasovius
 {
 
@@ -42,14 +44,43 @@ K { p_K }, X { std::move(p_X) }, coeff { std::move(b) }
 			                       "Number of points does not match value data vector length." };
 	}
 
-	arma::mat V = K(X,X);
+	size_t n = X.n_rows;
+
+	using arma::span;
+	arma::mat V(n,n);
+	constexpr size_t block_size = 64;
+	size_t num_blocks = n/block_size;
+
+	misc::stopwatch clock;
+
+	arma::mat buf(block_size,block_size);
+
+	#pragma omp for schedule(dynamic)
+	for ( size_t i_block = 0; i_block < num_blocks; ++i_block )
+	{
+		for ( size_t j_block = 0; j_block <= i_block; ++j_block )
+		{
+			size_t i_begin = i_block*block_size, i_end = i_begin + block_size - 1;
+			size_t j_begin = j_block*block_size, j_end = j_begin + block_size - 1;
+
+			V( span(i_begin,i_end), span(j_begin,j_end) ) = K( X(span(i_begin,i_end), span(0,X.n_cols-1) ),
+															   X(span(j_begin,j_end), span(0,X.n_cols-1) ));
+		}
+	}
+
+
+	size_t i_begin = num_blocks*block_size, i_end = n-1;
+	V( span(i_begin,i_end), span(0,n-1) ) = K( X(span(i_begin,i_end), span(0,X.n_cols-1) ),
+			                                   X(span(0,n-1), span(0,X.n_cols-1) ));
+
 	V.diag() += tikhonov_mu * arma::vec( X.n_rows, arma::fill::ones );
+	double elapsed = clock.elapsed();
+	std::cout << "Time for matrix assembly: " << elapsed << ".\n";
 
-	// Directly calling LAPACK's Cholesky routines is faster than:
-	// coeff = arma::solve( K(X,X), b );
 
+	clock.reset();
 	// Compute Cholesky decomposition V = L * L^T.
-	size_t n = V.n_rows; lapack_int info;
+	lapack_int info;
 	info = LAPACKE_dpotrf( LAPACK_COL_MAJOR, 'L', n, V.memptr(), n );
 	if ( info )
 	{
@@ -72,6 +103,8 @@ K { p_K }, X { std::move(p_X) }, coeff { std::move(b) }
 		throw std::runtime_error { "vlasovius::direct_interpolator::direct_interpolator(): "
 			                       "Error while solving triangular system L^Tx = y." };
 	}
+	elapsed = clock.elapsed();
+	std::cout << "Time for solving: " << elapsed << ".\n";
 }
 
 template <typename kernel>
