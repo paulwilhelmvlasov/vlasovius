@@ -42,10 +42,6 @@ public:
 	           const double        *X, size_t ldX,
 	           const double        *Y, size_t ldY ) const;
 
-	static constexpr size_t BLOCK_SIZE { 4 };
-	void block_eval( double *result,
-			         const arma::mat &X, size_t x_row,
-					 const arma::mat &Y, size_t y_row ) const;
 
 private:
 	rbf_function F   {};
