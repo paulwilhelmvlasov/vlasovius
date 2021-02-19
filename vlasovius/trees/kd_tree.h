@@ -21,13 +21,11 @@
 #ifndef VLASOVIUS_TREES_KD_TREE_H
 #define VLASOVIUS_TREES_KD_TREE_H
 
-
-#include <deque>
 #include <algorithm>
+#include <deque>
+#include <iostream>
 
 #include <armadillo>
-
-// #include <vlasovius/misc/row_iter.h>
 
 namespace vlasovius
 {

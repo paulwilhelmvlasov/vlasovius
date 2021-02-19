@@ -49,6 +49,8 @@ namespace vlasovius
 			std::vector<arma::uword> sortedIndices(points.n_rows);
 			std::iota(sortedIndices.begin(), sortedIndices.end(), 0);
 
+			std::cout << "Init worked. Starting building." << std::endl;
+
 			buildTree(sortedIndices, points, 0, minPerBox, maxPerBox);
 
 			sortPoints(sortedIndices, points);
@@ -69,17 +71,20 @@ namespace vlasovius
 				box.center(i)     = max - sidelength;
 			}
 
+			std::cout << "Computing first box worked." << std::endl;
 			return box;
 		}
 
 		void kd_tree::sortPoints(std::vector<arma::uword>& sortedIndices,
 							arma::mat& points)
 		{
+			std::cout << "Start final sort:" << std::endl;
 			arma::mat copy(points);
 			#pragma omp parallel for
 			for(long i = 0; i < sortedIndices.size(); i++){
 				points.row(i) = copy.row(sortedIndices[i]);
 			}
+			std::cout << "Finished final sort." << std::endl;
 		}
 
 
@@ -92,12 +97,12 @@ namespace vlasovius
 			// of points and the splitting value is the median of
 			// the respective coordinates of the points in the
 			// current box.
-
+			std::cout << "----------------------------------" << std::endl;
 			size_t numIndicesInBox = nodes[currentNodeIndex].indexLastElem
 					- nodes[currentNodeIndex].indexFirstElem;
 			if(numIndicesInBox > maxPerBox && (numIndicesInBox / 2) >= minPerBox){
 				// In this case split the node:
-
+				std::cout << "Splitting node." << std::endl;
 				// Init new nodes:
 				nodes.push_back(node());
 				nodes.push_back(node());
@@ -110,13 +115,13 @@ namespace vlasovius
 
 				nodes[firstChild].parent  = currentNodeIndex;
 				nodes[secondChild].parent = currentNodeIndex;
-
+				std::cout << "Init new nodes worked. " << std::endl;
 				// Compute splitting dimension:
 				size_t dimSplit = splittingDimension(currentNodeIndex);
-
+				std::cout << "DimSplit = " << dimSplit << std::endl;
 				// Split along the dimension at the correct value:
 				split(sortedIndices, points, currentNodeIndex, dimSplit);
-
+				std::cout << "Splitting successful" << std::endl;
 				// Compute boxes for children:
 				nodes[firstChild].box  = nodes[currentNodeIndex].box;
 				nodes[secondChild].box = nodes[currentNodeIndex].box;
@@ -133,7 +138,7 @@ namespace vlasovius
 
 				nodes[firstChild].box.center(dimSplit) -= firstSideLength;
 				nodes[secondChild].box.center(dimSplit) -= secondSideLength;
-
+				std::cout << "Computed box for new children:" << std::endl;
 				// Start recursion for children:
 				n_leafs++; // 1 leaf-node split into 2 leafs => Increment leaf-count.
 				buildTree(sortedIndices, points, firstChild, minPerBox, maxPerBox);
@@ -174,10 +179,16 @@ namespace vlasovius
 		{
 			//using vlasovius::misc::random_access_iterator;
 			//typedef random_access_iterator row_iter;
-
+			std::cout << "Starting split" << std::endl;
+			std::cout << "current node index " << currentNodeIndex << std::endl;
+			std::cout << "size nodes-array: " << nodes.size() << std::endl;
 			arma::uword first = nodes[currentNodeIndex].indexFirstElem;
 			arma::uword last  = nodes[currentNodeIndex].indexLastElem + 1;
-			arma::uword nth = (last - first) / 2;
+			arma::uword nth = first + (last - first) / 2;
+			std::cout << "first = " << first << std::endl;
+			std::cout << "last = " << last << std::endl;
+			std::cout << "nth = " << nth << std::endl;
+			std::cout << int((last - first) / 2) << std::endl;
 
 			auto comp = [&](arma::uword i, arma::uword j)->bool {
 				return points(i, dimSplit) < points(j, dimSplit);
@@ -188,6 +199,7 @@ namespace vlasovius
 					sortedIndices.begin() + last,
 					comp);
 
+			std::cout << "nth_element was successful." << std::endl;
 			nodes[nodes[currentNodeIndex].firstChild].indexFirstElem = first;
 			nodes[nodes[currentNodeIndex].firstChild].indexLastElem = nth;
 
