@@ -24,7 +24,7 @@
 
 int main()
 {
-	arma::mat points(10000000, 2, arma::fill::randu);
+	arma::mat points(1e5, 2, arma::fill::randu);
 	/*
 	points = {
 	{0.2, 1}, {0.4, 0.6}, {0.3, 0.4}, {0.6, 0.7}, {0.8, 0.3}
@@ -34,7 +34,7 @@ int main()
 	 */
 
 	vlasovius::misc::stopwatch watch;
-	vlasovius::trees::kd_tree baum(points, 100, 300);
+	vlasovius::trees::kd_tree baum(points,2000,3000);
 	double zeit = watch.elapsed();
 	std::cout << "Speedy speed: " << zeit << std::endl;
 	std::cout << "Number leafs: " << baum.getNumberLeafs() << std::endl;
