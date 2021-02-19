@@ -33,8 +33,8 @@ namespace vlasovius
 	{
 		struct bounding_box
 		{
-			arma::vec center;
-			arma::vec sidelength; // Distance from center to border
+			arma::rowvec center;
+			arma::rowvec sidelength; // Distance from center to border
 			// in each direction.
 
 			bool contains(const arma::vec& p) const;
