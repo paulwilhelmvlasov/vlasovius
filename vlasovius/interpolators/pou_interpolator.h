@@ -23,12 +23,32 @@
 #include <armadillo>
 
 #include <vlasovius/interpolators/direct_interpolator.h>
+#include <vlasovius/kernels/wendland.h>
+#include <vlasovius/kernels/rbf_kernel.h>
 #include <vlasovius/trees/kd_tree.h>
 
 namespace vlasovius
 {
 	namespace interpolators
 	{
+
+		template <size_t k>
+		class pou_inducing_kernel
+		{
+		public:
+			pou_inducing_kernel() = delete;
+			pou_inducing_kernel( const arma::rowvec& sigma);
+
+			arma::mat operator()( const arma::mat &xv1, const arma::mat &xv2 ) const;
+
+		private:
+			using rbf_wendland = vlasovius::kernels::wendland<1,k>;
+			using wendland     = vlasovius::kernels::rbf_kernel<rbf_wendland>;
+
+			std::vector<wendland> dim_kernels;
+		};
+
+
 		template <typename kernel>
 		class pou_interpolator
 		{
@@ -42,17 +62,19 @@ namespace vlasovius
 
 		private:
 			void construct_sub_sfx(arma::mat X, arma::vec b,
-					double enlargement_factor);
+					double enlargement_factor, double tikhonov_mu);
 
 		private:
 			kernel    K;
 			vlasovius::trees::kd_tree tree;
 
-			std::vector<direct_interpolator> sub_sfx;
+			std::vector<direct_interpolator<kernel>> sub_sfx;
+			std::vector<pou_inducing_kernel<4>> weight_fcts;
 			std::vector<vlasovius::trees::bounding_box> sub_domains;
 		};
 	}
 
 }
 
+#include <vlasovius/interpolators/pou_interpolator.tpp>
 #endif

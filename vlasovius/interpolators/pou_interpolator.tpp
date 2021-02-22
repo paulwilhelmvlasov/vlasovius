@@ -19,9 +19,34 @@
 
 #include "vlasovius/interpolators/pou_interpolator.h"
 
+template <size_t k>
+vlasovius::interpolators::pou_inducing_kernel<k>::pou_inducing_kernel( const arma::rowvec& sigma)
+{
+	size_t d = sigma.size();
+	dim_kernels.reserve(d);
 
+	for(size_t i = 0; i < d; i++)
+	{
+		dim_kernels.push_back(wendland{rbf_wendland {}, sigma(i) });
+	}
+}
 
-vlasovius::interpolators::pou_interpolator::pou_interpolator( kernel K, arma::mat X,
+template <size_t k>
+arma::mat vlasovius::interpolators::pou_inducing_kernel<k>::operator()( const arma::mat &xv1, const arma::mat &xv2 ) const
+{
+	arma::mat m = dim_kernels[0]( xv1.col(0), xv2.col(0) ) %
+		       dim_kernels[1]( xv1.col(1), xv2.col(1) );
+
+	for(size_t i = 2; i < dim_kernels.size(); i++)
+	{
+		m = m % dim_kernels[i]( xv1.col(i), xv2.col(i) );
+	}
+
+	return m;
+}
+
+template <typename kernel>
+vlasovius::interpolators::pou_interpolator<kernel>::pou_interpolator( kernel K, arma::mat X,
 		arma::vec b, double tikhonov_mu, size_t min_per_box, size_t max_per_box,
 		double enlargement_factor)
 : K(K), tree(vlasovius::trees::kd_tree(X, b, min_per_box, max_per_box))
@@ -31,12 +56,14 @@ vlasovius::interpolators::pou_interpolator::pou_interpolator( kernel K, arma::ma
 	}
 
 	sub_sfx.reserve(tree.getNumberLeafs());
+	weight_fcts.reserve(tree.getNumberLeafs());
 
-
+	construct_sub_sfx(X, b, enlargement_factor, tikhonov_mu);
 }
 
-void vlasovius::interpolators::pou_interpolator::construct_sub_sfx(arma::mat X,
-		arma::vec b, double enlargement_factor)
+template <typename kernel>
+void vlasovius::interpolators::pou_interpolator<kernel>::construct_sub_sfx(arma::mat X,
+		arma::vec b, double enlargement_factor, double tikhonov_mu)
 {
 	// Get the leaf-indices:
 	// (Note that usually there are approximately twice as many nodes as leafs
@@ -97,7 +124,7 @@ void vlasovius::interpolators::pou_interpolator::construct_sub_sfx(arma::mat X,
 			&& !(leaf_nd.indexFirstElem <= j && j <= leaf_nd.indexLastElem);
 				j++ )
 		{
-			if(sub_domains[i].contains(points(j)))
+			if(sub_domains[i].contains(X.row(j)))
 			{
 				indices_points[i].push_back(j);
 			}
@@ -116,6 +143,7 @@ void vlasovius::interpolators::pou_interpolator::construct_sub_sfx(arma::mat X,
 			sub_rhs(j) = b(curr);
 		}
 
-		sub_sfx.push_back(direct_interpolator(K, sub_pts, sub_rhs, tikhonov_mu));
+		sub_sfx.push_back(direct_interpolator<kernel>(K, sub_pts, sub_rhs, tikhonov_mu));
+		weight_fcts.push_back(pou_inducing_kernel<4>(sub_domains[i].sidelength));
 	}
 }
