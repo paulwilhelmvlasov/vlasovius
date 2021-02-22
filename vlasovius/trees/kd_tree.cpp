@@ -45,6 +45,7 @@ namespace vlasovius
 
 		kd_tree::kd_tree(arma::mat& points, arma::vec& rhs, size_t minPerBox, size_t maxPerBox)
 		{
+			vlasovius::misc::stopwatch clock;
 			// Set dimension of points:
 			dim = points.n_cols;
 
@@ -63,6 +64,8 @@ namespace vlasovius
 			buildTree(sortedIndices, points, 0, minPerBox, maxPerBox);
 
 			sortPoints(sortedIndices, points, rhs);
+			double elapsed { clock.elapsed() };
+			std::cout << "Time for computing kd-tree: " << elapsed << ".\n";
 		}
 
 		bounding_box computeBox(arma::mat& points)
@@ -204,7 +207,7 @@ namespace vlasovius
 			nodes[nodes[currentNodeIndex].secondChild].indexLastElem = last;
 		}
 
-		bool bounding_box::contains(const arma::vec& p) const
+		bool bounding_box::contains(const arma::rowvec& p) const
 		{
 			return arma::approx_equal( abs(center - p), sidelength, "reldiff", 1e-16);
 		}
@@ -231,7 +234,7 @@ namespace vlasovius
 			return nodes.at(i);
 		}
 
-		int kd_tree::whichBoxContains(const arma::vec& p) const
+		int kd_tree::whichBoxContains(const arma::rowvec& p) const
 		{
 			if(nodes[0].box.contains(p)){
 				// Trace the tree for the leaf-node containing

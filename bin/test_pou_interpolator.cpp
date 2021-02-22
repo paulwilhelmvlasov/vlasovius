@@ -26,12 +26,16 @@ int main()
 {
 
 	constexpr size_t dim { 2 }, k { 4 };
-	constexpr size_t N { 10000 };
+	constexpr size_t N { 100000 };
 	constexpr double tikhonov_mu { 1e-9 };
 	constexpr size_t min_per_box = 500;
-	constexpr size_t max_per_box = 500;
+	constexpr size_t max_per_box = 1000;
 	constexpr double enlarge = 1.5;
 	constexpr double twopi { 2*3.1415926535 };
+
+	std::cout << "N = " << N << std::endl;
+	std::cout << "min per Box = " << min_per_box << std::endl;
+	std::cout << "max per Box = " << max_per_box << std::endl;
 
 	using wendland_t     = vlasovius::kernels::wendland<dim,k>;
 	using kernel_t       = vlasovius::kernels::rbf_kernel<wendland_t>;

@@ -65,6 +65,7 @@ template <typename kernel>
 void vlasovius::interpolators::pou_interpolator<kernel>::construct_sub_sfx(arma::mat X,
 		arma::vec b, double enlargement_factor, double tikhonov_mu)
 {
+	vlasovius::misc::stopwatch clock;
 	// Get the leaf-indices:
 	// (Note that usually there are approximately twice as many nodes as leafs
 	// so just running through all nodes and checking on leaf-status might have
@@ -96,9 +97,15 @@ void vlasovius::interpolators::pou_interpolator<kernel>::construct_sub_sfx(arma:
 		indices_points[i] = std::deque<arma::uword>(leaf_nd.indexLastElem - leaf_nd.indexFirstElem);
 
 		// Fill index-list with current inhabitants:
-		std::iota(indices_points[i].begin() + leaf_nd.indexFirstElem,
+		/*std::iota(indices_points[i].begin() + leaf_nd.indexFirstElem,
 				indices_points[i].begin() + leaf_nd.indexLastElem,
-				leaf_nd.indexFirstElem);
+				leaf_nd.indexFirstElem);*/
+		size_t counter = 0;
+		for(arma::uword j = leaf_nd.indexFirstElem; j < leaf_nd.indexLastElem; j++)
+		{
+			indices_points[i][counter] = j;
+			counter++;
+		}
 
 		// Compute new bounding-box:
 		sub_domains[i] = leaf_nd.box;
@@ -111,9 +118,14 @@ void vlasovius::interpolators::pou_interpolator<kernel>::construct_sub_sfx(arma:
 
 		// While root (== 0) is not reached and the sub-domain is not a subset of the current
 		// bounding box trace the tree to the top.
-		while(index_curr_parent != 0 || !subset(sub_domains[i], tree.getNode(index_curr_parent).box))
+		while(!subset(sub_domains[i], tree.getNode(index_curr_parent).box))
 		{
-			index_curr_parent = tree.getNode(index_curr_parent).parent;
+			if(index_curr_parent > 0){
+				index_curr_parent = tree.getNode(index_curr_parent).parent;
+			}else{
+				index_curr_parent = 0;
+				break;
+			}
 		}
 
 		// Now check the contained points on intersection. Ignore the already known points (i.e.
@@ -143,7 +155,13 @@ void vlasovius::interpolators::pou_interpolator<kernel>::construct_sub_sfx(arma:
 			sub_rhs(j) = b(curr);
 		}
 
+		vlasovius::misc::stopwatch clock1;
 		sub_sfx.push_back(direct_interpolator<kernel>(K, sub_pts, sub_rhs, tikhonov_mu));
+		double elapsed1 { clock1.elapsed() };
+		std::cout << "Time for computing " << i << "th RBF-Approximation: " << elapsed1 << ".\n";
 		weight_fcts.push_back(pou_inducing_kernel<4>(sub_domains[i].sidelength));
 	}
+
+	double elapsed { clock.elapsed() };
+	std::cout << "Time for computing PoU-Interpolant-Approximation: " << elapsed << ".\n";
 }

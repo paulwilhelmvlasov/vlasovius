@@ -27,6 +27,8 @@
 
 #include <armadillo>
 
+#include <vlasovius/misc/stopwatch.h>
+
 namespace vlasovius
 {
 	namespace trees
@@ -37,7 +39,7 @@ namespace vlasovius
 			arma::rowvec sidelength; // Distance from center to border
 			// in each direction.
 
-			bool contains(const arma::vec& p) const;
+			bool contains(const arma::rowvec& p) const;
 		};
 
 		bool subset(const bounding_box& first, const bounding_box& second);
@@ -68,7 +70,7 @@ namespace vlasovius
 			size_t getNumberLeafs() const;
 			size_t get_number_nodes() const;
 			node getNode(size_t i) const;
-			int whichBoxContains(const arma::vec& p) const;
+			int whichBoxContains(const arma::rowvec& p) const;
 			int whichBoxContains(size_t i) const;
 
 		private:
