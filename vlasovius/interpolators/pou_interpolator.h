@@ -22,22 +22,34 @@
 #include <vector>
 #include <armadillo>
 
+#include <vlasovius/interpolators/direct_interpolator.h>
+#include <vlasovius/trees/kd_tree.h>
+
 namespace vlasovius
 {
 	namespace interpolators
 	{
+		template <typename kernel>
 		class pou_interpolator
 		{
 		public:
-			pou_interpolator(arma::mat points, 
-				const arma::vec& f,
-				double sigma = 1.0);
-			
-		public:
-			double operator()(const arma::vec& x) const;
+			pou_interpolator( kernel K, arma::mat X, arma::vec b,
+					double tikhonov_mu = 0, size_t min_per_box = 100,
+					size_t max_per_box = 200,
+					double enlargement_factor = 1.5);
 
+			arma::vec operator()( const arma::mat &Y ) const;
 
 		private:
+			void construct_sub_sfx(arma::mat X, arma::vec b,
+					double enlargement_factor);
+
+		private:
+			kernel    K;
+			vlasovius::trees::kd_tree tree;
+
+			std::vector<direct_interpolator> sub_sfx;
+			std::vector<vlasovius::trees::bounding_box> sub_domains;
 		};
 	}
 

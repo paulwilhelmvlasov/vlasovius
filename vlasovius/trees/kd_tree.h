@@ -40,6 +40,8 @@ namespace vlasovius
 			bool contains(const arma::vec& p) const;
 		};
 
+		bool subset(const bounding_box& first, const bounding_box& second);
+
 		struct node
 		{
 			int parent 		= -1;
@@ -55,24 +57,27 @@ namespace vlasovius
 			bool isLeaf() const;
 		};
 
-		template<arma::uword dim> bool compVec
-		(const arma::vec& first, const arma::vec& second);
+		bounding_box computeBox(arma::mat& points);
 
 		class kd_tree
 		{
 		public:
-			kd_tree(arma::mat& points, size_t minPerBox, size_t maxPerBox);
+			kd_tree(arma::mat& points, arma::vec& rhs, size_t minPerBox, size_t maxPerBox);
 
 		public:
 			size_t getNumberLeafs() const;
+			size_t get_number_nodes() const;
 			node getNode(size_t i) const;
 			int whichBoxContains(const arma::vec& p) const;
 			int whichBoxContains(size_t i) const;
 
 		private:
-			bounding_box computeBox(arma::mat& points);
+
+			// Sorting after build:
 			void sortPoints(std::vector<arma::uword>& sortedIndices,
-					arma::mat& points);
+					arma::mat& points, arma::vec& rhs);
+
+			// Tree-build methods:
 			void buildTree(std::vector<arma::uword>& sortedIndices,
 					arma::mat& points, size_t currentNodeIndex,
 					size_t minPerBox, size_t maxPerBox);
