@@ -17,10 +17,9 @@
  * vlasovius; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
 
-#include "vlasovius/interpolators/pou_interpolator.h"
 
 template <size_t k>
-vlasovius::interpolators::pou_inducing_kernel<k>::pou_inducing_kernel( const arma::rowvec& sigma)
+vlasovius::interpolators::pou_inducing_kernel<k>::pou_inducing_kernel( const arma::rowvec& sigma )
 {
 	size_t d = sigma.size();
 	dim_kernels.reserve(d);
@@ -87,6 +86,7 @@ void vlasovius::interpolators::pou_interpolator<kernel>::construct_sub_sfx(arma:
 	std::vector<std::deque<arma::uword>> indices_points(n_leafs);
 	sub_domains = std::vector<vlasovius::trees::bounding_box>(n_leafs);
 
+	#pragma omp parallel for
 	for(size_t i = 0; i < n_leafs; i++) // Can I pragma parallel for this?
 	{
 		size_t index_node = indices_leafs[i];
@@ -143,7 +143,6 @@ void vlasovius::interpolators::pou_interpolator<kernel>::construct_sub_sfx(arma:
 		arma::mat sub_pts(N_sub, X.n_cols);
 		arma::vec sub_rhs(N_sub);
 
-		#pragma omp parallel for
 		for(size_t j = 0; j < indices_points[i].size(); j++)
 		{
 			arma::uword curr = indices_points[i][j];
@@ -151,8 +150,15 @@ void vlasovius::interpolators::pou_interpolator<kernel>::construct_sub_sfx(arma:
 			sub_rhs(j) = b(curr);
 		}
 
-		sub_sfx.push_back(direct_interpolator<kernel>(K, sub_pts, sub_rhs, tikhonov_mu));
-		weight_fcts.push_back(pou_inducing_kernel<4>(sub_domains[i].sidelength));
+		direct_interpolator<kernel> sfx (K, sub_pts, sub_rhs, tikhonov_mu );
+		pou_inducing_kernel<4>      w   (sub_domains[i].sidelength);
+
+		// Writing to the shared arrays can only happen one at a time.
+		#pragma omp critical
+		{
+			sub_sfx.push_back( std::move(sfx) );
+			weight_fcts.push_back( std::move(w) );
+		}
 	}
 
 	// For faster evaluation compute which sub-domains intersect which leafs:

@@ -204,6 +204,8 @@ int main()
 	kernel_t K( sigma_x, sigma_v, L );
 
 
+	size_t num_threads = omp_get_max_threads();
+
 	// Runge--Kutta Butcher tableau.
 	constexpr double c_rk4[4][4] = { {   0,   0,  0, 0 },
 	                                 { 0.5,   0,  0, 0 },
@@ -228,7 +230,7 @@ int main()
 	}
 
 	// Initialise xv.
-	size_t Nx = 20, Nv = 500;
+	size_t Nx = 20, Nv = 200;
 	xv.set_size( Nx*Nv,2 );
 	f.resize( Nx*Nv );
 	for ( size_t i = 0; i < Nx; ++i )
@@ -248,7 +250,7 @@ int main()
 	std::ofstream str("E.txt");
 	while ( t < T )
 	{
-		std::cout << "t = " << t << ". "; std::cout.flush();
+		std::cout << "t = " << t << ". " << std::endl;
 		vlasovius::misc::stopwatch clock;
 		for ( size_t stage = 0; stage < 4; ++stage )
 		{
@@ -259,21 +261,21 @@ int main()
 			k_xv[ stage ].resize( xv.n_rows, xv.n_cols );
 			k_xv[ stage ].col(0) = xv_stage.col(1);
 
-			interpolator_t sfx( K, xv_stage, f );
+			interpolator_t sfx( K, xv_stage, f, 0, num_threads );
 
 			std::cout << "Interpolation error: " << norm(f-K(xv_stage,xv_stage)*sfx.coeffs(),"inf") << std::endl;
 
 			arma::vec rho = arma::vec(rho_points.n_rows,arma::fill::ones) -
 					        2 * W.integral() * sigma_v * K.eval_x( rho_points, xv_stage ) * sfx.coeffs();
-			double electric_energy = poisson.update_rho( rho );
+			poisson.update_rho( rho );
 
 			for ( size_t i = 0; i < xv_stage.n_rows; ++i )
 				k_xv[stage](i,1) = -poisson.E( xv_stage(i,0) );
 
 			if ( stage == 0 )
 			{
-				str << t << " " << std::sqrt(electric_energy) << std::endl;
-				std::cout << "Electric energy norm: " << std::sqrt(electric_energy) << "." << std::endl;
+				str << t << " " << norm(k_xv[stage].col(1),"inf")  << std::endl;
+				std::cout << "Max-norm of E: " << norm(k_xv[stage].col(1),"inf") << "." << std::endl;
 			}
  		}
 
