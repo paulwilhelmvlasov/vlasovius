@@ -27,18 +27,20 @@ namespace kernels
 namespace wendland_impl
 {
 
-void compute_coefficients( size_t dim, size_t k, double *result );
+void compute_coefficients( size_t dim, size_t k, double *result, double *integral );
 
 }
 
-template <size_t dim, size_t k>
-wendland<dim,k>::wendland()
+template <size_t dim, size_t k, typename simd_t>
+wendland<dim,k,simd_t>::wendland()
 {
-	wendland_impl::compute_coefficients( dim, k, c );
+	wendland_impl::compute_coefficients( dim, k, c, &integral_ );
+	for ( size_t i = 0; i < (dim/2) + 3*k + 2; ++i )
+		cc[i] = c[i];
 }
 
-template <size_t dim, size_t k>
-double wendland<dim,k>::operator()( double r ) const noexcept
+template <size_t dim, size_t k, typename simd_t>
+double wendland<dim,k,simd_t>::operator()( double r ) const noexcept
 {
 	constexpr size_t N { (dim/2) + 3*k + 2 };
 
@@ -60,74 +62,78 @@ double wendland<dim,k>::operator()( double r ) const noexcept
 	return std::fma(f,z,c[N-1]) - z_prev;
 }
 
-#if defined(HAVE_AVX_INSTRUCTIONS) && defined(HAVE_FMA_INSTRUCTIONS)
-
-template <size_t dim, size_t k>
-arma::vec wendland<dim,k>::operator()( arma::vec rvec ) const
+template <size_t dim, size_t k, typename simd_t>
+simd_t wendland<dim,k,simd_t>::operator()( simd_t r ) const noexcept
 {
 	constexpr size_t N { (dim/2) + 3*k + 2 };
 
-	__m256d cc[N];
-	for ( size_t i = 0; i < N; ++i )
-		cc[i] = _mm256_broadcast_sd( &c[i] );
-
-	__m256d sign_mask  = _mm256_set1_pd(-0.0);
-	__m256d ones       = _mm256_set1_pd( 1.0);
-
-	size_t num_chunks = rvec.size()/4;
-	#pragma omp parallel for schedule(static)
-	for ( size_t chunk = 0; chunk < num_chunks; ++chunk )
+	r = abs(r);
+	simd_t fhalf  { r+r-1.0 }, f { fhalf + fhalf };
+	simd_t z_prev { cc[0] },   z { fmadd(f,cc[0],cc[1]) };
+	for ( size_t i = 2; i < N-1; ++i )
 	{
-		__m256d r = _mm256_loadu_pd( rvec.memptr() + 4*chunk );
-		r = _mm256_andnot_pd( sign_mask, r ); // r = abs(r);
-
-		__m256d threshold = _mm256_cmp_pd( r, ones, _CMP_LT_OQ );
-		if ( _mm256_testz_pd(threshold,threshold) )
-		{
-			// if all r >= 1 store zero and continue.
-			_mm256_storeu_pd( rvec.memptr() + 4*chunk,  _mm256_setzero_pd() );
-			continue;
-		}
-
-
-		// Clenshaw algorithm.
-		__m256d fhalf  = _mm256_add_pd(r,r);
-		        fhalf  = _mm256_sub_pd(fhalf,ones);			// f_half = 2*r - 1;
-		__m256d f      = _mm256_add_pd(fhalf,fhalf);		// f      = 4*r - 2;
-		__m256d z_prev = cc[0];
-		__m256d z      = _mm256_fmadd_pd(f,cc[0],cc[1]);	// z = f*c[0] - c[1];
-		for ( size_t i = 2; i < N-1; ++i )
-		{
-			__m256d tmp = _mm256_fmadd_pd(f,z,cc[i]);
-			tmp = _mm256_sub_pd( tmp, z_prev );  // tmp = f*z + c[i] - z_prev;
-			z_prev = z;
-			z      = tmp;
-		}
-		z = _mm256_fmadd_pd(fhalf,z,cc[N-1]);
-		z = _mm256_sub_pd( z, z_prev );
-		z = _mm256_and_pd( z, threshold ); // Set zero if r >= 1.
-		_mm256_storeu_pd( rvec.memptr() + 4*chunk,  z );
+		simd_t tmp = fmadd(f,z,cc[i])-z_prev;
+		z_prev = z;
+		z      = tmp;
 	}
+	z = (fmadd(fhalf,z,cc[N-1]) - z_prev) & less_than( r, 1.0 );
 
-	// Compute the remaining entries in scalar mode.
-	for ( size_t i = 4*num_chunks; i < rvec.size(); ++i )
-		rvec[i] = (*this)(rvec[i]);
+	return z;
+}
 
+template <size_t dim, size_t k, typename simd_t>
+arma::vec wendland<dim,k,simd_t>::operator()( arma::vec rvec ) const
+{
+	eval( rvec.memptr(), rvec.size() );
 	return rvec;
 }
 
-#else
-
-template <size_t dim, size_t k>
-arma::vec wendland<dim,k>::operator()( arma::vec r ) const
+template <size_t dim, size_t k, typename simd_t>
+void wendland<dim,k,simd_t>::eval( double *__restrict__ result, size_t n ) const noexcept
 {
-	#pragma omp parallel for schedule(static)
-	for ( size_t i = 0; i < r.size(); ++i )
-		r[i] = (*this)(r[i]);
-	return r;
+	constexpr size_t N { (dim/2) + 3*k + 2 };
+
+	if constexpr ( simd_t::size() == 1 )
+	{
+		for ( size_t i = 0; i < n; ++i )
+			result[i] = (*this)(result[i]);
+		return;
+	}
+	else
+	{
+		size_t i { 0 };
+		for ( ; i + simd_t::size() < n; i += simd_t::size() )
+		{
+			simd_t r { result + i };
+
+			r = abs(r);
+			simd_t fhalf  { r+r-1.0 }, f { fhalf + fhalf };
+			simd_t z_prev { cc[0] },   z { fmadd(f,cc[0],cc[1]) };
+			for ( size_t i = 2; i < N-1; ++i )
+			{
+				simd_t tmp = fmadd(f,z,cc[i])-z_prev;
+				z_prev = z;
+				z      = tmp;
+			}
+			z = (fmadd(fhalf,z,cc[N-1]) - z_prev) & less_than( r, 1.0 );
+			z.store( result + i );
+		}
+
+		// Compute the remaining entries in scalar mode.
+		for ( ; i < n; ++i )
+			result[i] = (*this)( result[i] );
+	}
 }
 
-#endif
+/*!
+ * \brief Computes the integral of the Wendland function over the positive reals.
+ * \int_{0}^{\infty} W(r)\,{\mathrm dr} = \int_{0}^{1} W(r)\,{\mathrm dr}.
+ */
+template <size_t dim, size_t k, typename simd_t> inline
+double wendland<dim,k,simd_t>::integral() const noexcept
+{
+	return integral_;
+}
 
 }
 

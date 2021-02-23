@@ -16,41 +16,42 @@
  * You should have received a copy of the GNU General Public License along with
  * vlasovius; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
-#ifndef VLASOVIUS_KERNELS_RBF_KERNEL_H
-#define VLASOVIUS_KERNELS_RBF_KERNEL_H
+#ifndef VLASOVIUS_MISC_SIMD_H
+#define VLASOVIUS_MISC_SIMD_H
 
-#include <armadillo>
-#include <vlasovius/misc/simd.h>
+#include <vlasovius/config.h>
+
+
 
 namespace vlasovius
 {
 
-namespace kernels
+namespace misc
 {
 
-template <typename rbf_function>
-class rbf_kernel
-{
-public:
-	rbf_kernel( rbf_function p_F = rbf_function {}, double sigma = 1 );
+enum class simd_abi { scalar, avx };
 
-	arma::mat operator()( const arma::mat &X, const arma::mat &Y ) const;
-
-
-	void eval( size_t dim, size_t n, size_t m,
-			   double *__restrict__ K, size_t ldK,
-	           const double        *X, size_t ldX,
-	           const double        *Y, size_t ldY ) const;
-
-
-private:
-	rbf_function F   {};
-	double inv_sigma {1};
-};
-
-}
-
-}
-
-#include <vlasovius/kernels/rbf_kernel.tpp>
+#if defined(__AVX2__)
+constexpr simd_abi native_simd_abi { simd_abi::avx };
+#else
+constexpr simd_abi native_simd_abi { simd_abi::scalar };
 #endif
+
+
+template <typename T, simd_abi abi = native_simd_abi > class simd;
+
+template <typename T>
+using native_simd = simd<T,native_simd_abi>;
+
+}
+
+}
+
+#if defined(__AVX2__)
+#include <vlasovius/misc/simd_avx.tpp>
+#endif
+
+#include <vlasovius/misc/simd_scalar.tpp>
+
+#endif
+

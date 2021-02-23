@@ -20,11 +20,7 @@
 #define VLASOVIUS_KERNELS_WENDLAND_H
 
 #include <armadillo>
-#include <vlasovius/config.h>
-
-#if  defined(HAVE_AVX_INSTRUCTIONS) && defined(HAVE_FMA_INSTRUCTIONS)
-#include <immintrin.h>
-#endif
+#include <vlasovius/misc/simd.h>
 
 namespace vlasovius
 {
@@ -32,10 +28,13 @@ namespace vlasovius
 namespace kernels
 {
 
-template <size_t dim, size_t k>
+template <size_t dim, size_t k, typename simd_t = ::vlasovius::misc::simd<double> >
 class wendland
 {
 public:
+
+	using simd_type = simd_t;
+
 	wendland();
 
 	// Copies sometimes could make sense, when passing a kernel by value and
@@ -50,10 +49,17 @@ public:
 
 	// The heart of the matter: evaluation.
 	double    operator()( double r    ) const noexcept;
+	simd_t    operator()( simd_t v    ) const noexcept;
 	arma::vec operator()( arma::vec r ) const;
 
+	void eval( double *r, size_t n ) const noexcept;
+
+	double integral() const noexcept;
+
 private:
+	simd_t  cc[ (dim/2) + 3*k + 2 ];
 	double  c [ (dim/2) + 3*k + 2 ];
+	double  integral_;
 };
 
 }

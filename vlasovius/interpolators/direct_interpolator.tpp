@@ -19,6 +19,8 @@
 
 #include <lapacke.h>
 
+#include <vlasovius/misc/stopwatch.h>
+
 namespace vlasovius
 {
 
@@ -42,36 +44,65 @@ K { p_K }, X { std::move(p_X) }, coeff { std::move(b) }
 			                       "Number of points does not match value data vector length." };
 	}
 
-	arma::mat V = K(X,X);
-	V.diag() += tikhonov_mu * arma::vec( X.n_rows, arma::fill::ones );
+	const size_t n = X.n_rows, dim = X.n_cols, ldX  = n;
+	const size_t ar_rows = (n & 1) ?  (n      ) : (n+1);
+	const size_t ar_cols = (n & 1) ?  (n/2 + 1) : (n/2);
 
-	// Directly calling LAPACK's Cholesky routines is faster than:
-	// coeff = arma::solve( K(X,X), b );
+	// AR is stored in Rectangular Full Packed Format (RFPF)
+	// See reference [gstv2010]
+	arma::mat AR( ar_rows, ar_cols );
 
-	// Compute Cholesky decomposition V = L * L^T.
-	size_t n = V.n_rows; lapack_int info;
-	info = LAPACKE_dpotrf( LAPACK_COL_MAJOR, 'L', n, V.memptr(), n );
+	misc::stopwatch clock;
+	if ( n & 1 )
+	{
+		// First column
+		K.eval( dim, n, 1, &AR(0,0), ar_rows, &X(0,0), ldX, &X(0,0), ldX );
+
+		// Remaining columns.
+		#pragma omp parallel for
+		for ( size_t j = 1; j < ar_cols; ++j )
+		{
+			// Upper part of column
+			K.eval( dim, j, 1, &AR(0,j), ar_rows, &X(n/2+1,0), ldX, &X(n/2+j,0), ldX );
+
+			// Lower part of column
+			K.eval( dim, n-j, 1, &AR(j,j), ar_rows, &X(j,0), ldX, &X(j,0), ldX );
+			AR(j,j) += tikhonov_mu;
+		}
+	}
+	else
+	{
+		#pragma omp parallel for
+		for ( size_t j = 0; j < ar_cols; ++j )
+		{
+			// Upper part of column j
+			K.eval( dim, j+1, 1, &AR(0,j), ar_rows, &X(n/2,0), ldX, &X(n/2+j,0), ldX );
+
+			// Lower part of column j
+			K.eval( dim, n-j, 1, &AR(j+1,j), ar_rows, &X(j,0), ldX, &X(j,0), ldX );
+			AR(j+1,j) += tikhonov_mu;
+		}
+	}
+	double elapsed = clock.elapsed();
+	std::cout << "Time for matrix assembly: " << elapsed << ".\n";
+
+	clock.reset();
+	lapack_int info = LAPACKE_dpftrf( LAPACK_COL_MAJOR, 'N', 'L', n, AR.memptr() );
 	if ( info )
 	{
 		throw std::runtime_error { "vlasovius::direct_interpolator::direct_interpolator(): "
-			                       "Error while computing Cholesky factorisation of Vandermonde matrix." };
+		                           "Error while computing Cholesky factorisation of Vandermonde matrix." };
 	}
 
-	// Solve Ly = b; We already initialised coeff with b.
-	info = LAPACKE_dtrtrs( LAPACK_COL_MAJOR, 'L', 'N', 'N', n, 1, V.memptr(), n, coeff.memptr(), n );
+	info = LAPACKE_dpftrs( LAPACK_COL_MAJOR, 'N', 'L', n, 1, AR.memptr(), coeff.memptr(), n );
 	if ( info )
 	{
 		throw std::runtime_error { "vlasovius::direct_interpolator::direct_interpolator(): "
-			                       "Error while solving triangular system Ly = b." };
+				                   "Error while solving triangular systems L^Tx = y, Ly = b." };
 	}
 
-	// Solve L^T x = y;
-	info = LAPACKE_dtrtrs( LAPACK_COL_MAJOR, 'L', 'T', 'N', n, 1, V.memptr(), n, coeff.memptr(), n );
-	if ( info )
-	{
-		throw std::runtime_error { "vlasovius::direct_interpolator::direct_interpolator(): "
-			                       "Error while solving triangular system L^Tx = y." };
-	}
+	elapsed = clock.elapsed();
+	std::cout << "Time for solving: " << elapsed << ".\n";
 }
 
 template <typename kernel>
