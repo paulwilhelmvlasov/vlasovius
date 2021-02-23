@@ -43,6 +43,7 @@ namespace vlasovius
 		};
 
 		bool subset(const bounding_box& first, const bounding_box& second);
+		bool intersect(const bounding_box& first, const bounding_box& second);
 
 		struct node
 		{
@@ -70,8 +71,8 @@ namespace vlasovius
 			size_t getNumberLeafs() const;
 			size_t get_number_nodes() const;
 			node getNode(size_t i) const;
-			int whichBoxContains(const arma::rowvec& p) const;
-			int whichBoxContains(size_t i) const;
+			int whichLeafContains(const arma::rowvec& p) const;
+			int whichLeafContains(size_t i) const;
 
 		private:
 

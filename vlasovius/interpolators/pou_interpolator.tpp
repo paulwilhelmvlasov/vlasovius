@@ -73,7 +73,6 @@ void vlasovius::interpolators::pou_interpolator<kernel>::construct_sub_sfx(arma:
 	size_t n_nodes = tree.get_number_nodes();
 	size_t n_leafs = tree.getNumberLeafs();
 
-	std::vector<size_t> indices_leafs;
 	indices_leafs.reserve(n_leafs);
 
 	for(size_t i = 0; i < n_nodes; i++){
@@ -97,9 +96,6 @@ void vlasovius::interpolators::pou_interpolator<kernel>::construct_sub_sfx(arma:
 		indices_points[i] = std::deque<arma::uword>(leaf_nd.indexLastElem - leaf_nd.indexFirstElem);
 
 		// Fill index-list with current inhabitants:
-		/*std::iota(indices_points[i].begin() + leaf_nd.indexFirstElem,
-				indices_points[i].begin() + leaf_nd.indexLastElem,
-				leaf_nd.indexFirstElem);*/
 		size_t counter = 0;
 		for(arma::uword j = leaf_nd.indexFirstElem; j < leaf_nd.indexLastElem; j++)
 		{
@@ -155,13 +151,99 @@ void vlasovius::interpolators::pou_interpolator<kernel>::construct_sub_sfx(arma:
 			sub_rhs(j) = b(curr);
 		}
 
-		vlasovius::misc::stopwatch clock1;
 		sub_sfx.push_back(direct_interpolator<kernel>(K, sub_pts, sub_rhs, tikhonov_mu));
-		double elapsed1 { clock1.elapsed() };
-		std::cout << "Time for computing " << i << "th RBF-Approximation: " << elapsed1 << ".\n";
 		weight_fcts.push_back(pou_inducing_kernel<4>(sub_domains[i].sidelength));
+	}
+
+	// For faster evaluation compute which sub-domains intersect which leafs:
+	domains_intersect_leafs.resize(n_leafs);
+
+	for(size_t i_leaf = 0; i_leaf < n_leafs; i_leaf++)
+	{
+		vlasovius::trees::bounding_box box_leaf = tree.getNode(indices_leafs[i_leaf]).box;
+		for(size_t i_d = 0; i_d < n_leafs; i_d++)
+		{
+			if(vlasovius::trees::intersect(box_leaf, sub_domains[i_d]))
+			{
+				domains_intersect_leafs[i_leaf].push_back(i_d);
+			}
+		}
 	}
 
 	double elapsed { clock.elapsed() };
 	std::cout << "Time for computing PoU-Interpolant-Approximation: " << elapsed << ".\n";
+}
+
+template <typename kernel>
+arma::vec vlasovius::interpolators::pou_interpolator<kernel>::operator()( const arma::mat &Y ) const
+{
+	std::vector<int> w(Y.n_rows);
+	size_t n_submat = indices_leafs.size() + 1;
+	std::vector<size_t> sizes_sub_matrices(n_submat, 0);
+	// Compute in which leaf each evaluation point lies and the needed
+	// sub-matrix size for each leaf:
+	for(size_t i = 0; i < w.size(); i++)
+	{
+		w[i] = tree.whichLeafContains(Y.row(i));
+		if(w[i] < 0){
+			sizes_sub_matrices[n_submat - 1]++;
+			w[i] = n_submat;
+		} else {
+			sizes_sub_matrices[w[i]]++;
+		}
+	}
+
+	// Reserve space for the sub-matrices:
+	std::vector<arma::mat> sub_matrix(n_submat);
+	std::vector<std::vector<arma::uword>> orig_indices(n_submat);
+	for(size_t i = 0; i < n_submat; i++)
+	{
+		sub_matrix[i] = arma::mat(sizes_sub_matrices[i], Y.n_cols);
+		orig_indices[i].resize(sizes_sub_matrices[i]);
+	}
+
+	// Fill sub-matrices and remember the index of the point in
+	// the original matrix to construct the correctly ordered
+	// return vector:
+	std::vector<size_t> curr_row_index(n_submat, 0);
+	for(size_t i = 0; i < Y.n_rows; i++)
+	{
+		size_t index_submat = w[i];
+		arma::uword row_index = curr_row_index[index_submat];
+		sub_matrix[index_submat].row(row_index) = Y.row(i);
+		orig_indices[index_submat][row_index] = i;
+		curr_row_index[index_submat]++;
+	}
+
+	// Now evaluate for each sub-matrix:
+	std::vector<arma::vec> sub_r(n_submat);
+	sub_r[n_submat] = arma::vec(sizes_sub_matrices[n_submat - 1], arma::fill::zeros);
+	for(size_t i = 0; i < n_submat - 1; i++){
+		// The formula is now:
+		// f(x) = sum_{i in containingBoxes} f[i](x) * w[i](x) / (sum_{i in containingBoxes} w[i](x) )
+		arma::vec denominator(sizes_sub_matrices[i], arma::fill::zeros);
+		arma::vec nominator(sizes_sub_matrices[i], arma::fill::zeros);
+
+		for(size_t j: domains_intersect_leafs[i])
+		{
+			nominator   += sub_sfx[j](sub_matrix[i]) % weight_fcts[j](sub_domains[j].center, sub_matrix[i]);
+			denominator += weight_fcts[j](sub_domains[j].center, sub_matrix[i]);
+		}
+
+		sub_r[i] = nominator / denominator;
+	}
+
+
+	// Construct return-vector:
+	arma::vec r(Y.n_rows, arma::fill::zeros);
+
+	for(size_t i_mat = 0; i_mat < orig_indices.size(); i_mat++)
+	{
+		for(size_t i_row = 0; i_row < orig_indices[i_mat].size(); i_row++)
+		{
+			r(orig_indices[i_mat][i_row]) = sub_r[i_mat](i_row);
+		}
+	}
+
+	return r;
 }

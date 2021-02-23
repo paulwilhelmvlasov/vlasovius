@@ -43,6 +43,22 @@ namespace vlasovius
 			return true;
 		}
 
+		bool intersect(const bounding_box& first, const bounding_box& second)
+		{
+			size_t d = second.center.size();
+
+			for(long i = 0; i < d; i++)
+			{
+				double dist = std::abs(first.center(i) - second.center(i));
+				if( dist <= first.sidelength(i) || dist <= second.sidelength(i) )
+				{
+					return true;
+				}
+			}
+
+			return false;
+		}
+
 		kd_tree::kd_tree(arma::mat& points, arma::vec& rhs, size_t minPerBox, size_t maxPerBox)
 		{
 			vlasovius::misc::stopwatch clock;
@@ -234,7 +250,7 @@ namespace vlasovius
 			return nodes.at(i);
 		}
 
-		int kd_tree::whichBoxContains(const arma::rowvec& p) const
+		int kd_tree::whichLeafContains(const arma::rowvec& p) const
 		{
 			if(nodes[0].box.contains(p)){
 				// Trace the tree for the leaf-node containing
@@ -258,7 +274,7 @@ namespace vlasovius
 			}
 		}
 
-		int kd_tree::whichBoxContains(size_t i) const
+		int kd_tree::whichLeafContains(size_t i) const
 		{
 			if(i <= nodes[0].indexLastElem )
 			{

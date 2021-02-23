@@ -48,7 +48,6 @@ namespace vlasovius
 			std::vector<wendland> dim_kernels;
 		};
 
-
 		template <typename kernel>
 		class pou_interpolator
 		{
@@ -71,6 +70,8 @@ namespace vlasovius
 			std::vector<direct_interpolator<kernel>> sub_sfx;
 			std::vector<pou_inducing_kernel<4>> weight_fcts;
 			std::vector<vlasovius::trees::bounding_box> sub_domains;
+			std::vector<size_t> indices_leafs;
+			std::vector<std::vector<size_t>> domains_intersect_leafs;
 		};
 	}
 
