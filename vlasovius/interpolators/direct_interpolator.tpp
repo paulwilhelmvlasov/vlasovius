@@ -120,7 +120,24 @@ arma::vec direct_interpolator<kernel>::operator()( const arma::mat &Y ) const
 		                           "Evaluation and Interpolation points have differing dimensions." };
 	}
 
-	return K(Y,X)*coeff;
+	size_t dim = X.n_cols, n = Y.n_rows, m = X.n_rows;
+	arma::vec result( Y.n_rows, arma::fill::zeros );
+
+	#pragma omp parallel
+	{
+		arma::vec tmp( Y.n_rows ), thread_sum( Y.n_rows, arma::fill::zeros );
+
+		#pragma omp for
+		for ( size_t i = 0; i < X.n_rows; ++i )
+		{
+			K.eval( dim, n, 1, tmp.memptr(), n, Y.memptr(), n, &X(i,0), m );
+			thread_sum += tmp*coeff(i);
+		}
+
+		#pragma omp critical
+		result += thread_sum;
+	}
+	return result;
 }
 
 }
