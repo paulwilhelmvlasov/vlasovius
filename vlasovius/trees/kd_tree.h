@@ -21,13 +21,13 @@
 #ifndef VLASOVIUS_TREES_KD_TREE_H
 #define VLASOVIUS_TREES_KD_TREE_H
 
-
-#include <deque>
 #include <algorithm>
+#include <deque>
+#include <iostream>
 
 #include <armadillo>
 
-#include <vlasovius/misc/row_iter.h>
+#include <vlasovius/misc/stopwatch.h>
 
 namespace vlasovius
 {
@@ -35,12 +35,15 @@ namespace vlasovius
 	{
 		struct bounding_box
 		{
-			arma::vec center;
-			arma::vec sidelength; // Distance from center to border
+			arma::rowvec center;
+			arma::rowvec sidelength; // Distance from center to border
 			// in each direction.
 
-			bool contains(const arma::vec& p);
+			bool contains(const arma::rowvec& p) const;
 		};
+
+		bool subset(const bounding_box& first, const bounding_box& second);
+		bool intersect(const bounding_box& first, const bounding_box& second);
 
 		struct node
 		{
@@ -54,29 +57,41 @@ namespace vlasovius
 
 			bounding_box box;
 
-			bool isLeaf();
+			bool isLeaf() const;
 		};
 
-		template<arma::uword dim> bool compVec
-		(const arma::vec& first, const arma::vec& second);
+		bounding_box computeBox(arma::mat& points);
 
 		class kd_tree
 		{
 		public:
-			kd_tree(arma::mat& points, size_t minPerBox, size_t maxPerBox);
+			kd_tree(arma::mat& points, arma::vec& rhs, size_t minPerBox, size_t maxPerBox);
 
 		public:
+			size_t getNumberLeafs() const;
+			size_t get_number_nodes() const;
 			node getNode(size_t i) const;
-			int whichBoxContains(const arma::vec& p) const;
-			int whichBoxContains(size_t i) const;
+			int whichLeafContains(const arma::rowvec& p) const;
+			int whichLeafContains(size_t i) const;
 
 		private:
-			void buildTree(arma::mat& points, size_t currentNodeIndex, size_t minPerBox, size_t maxPerBox);
+
+			// Sorting after build:
+			void sortPoints(std::vector<arma::uword>& sortedIndices,
+					arma::mat& points, arma::vec& rhs);
+
+			// Tree-build methods:
+			void buildTree(std::vector<arma::uword>& sortedIndices,
+					arma::mat& points, size_t currentNodeIndex,
+					size_t minPerBox, size_t maxPerBox);
 			size_t splittingDimension(size_t currentNodeIndex);
-			void split(size_t currentNodeIndex, size_t dimSplit);
+			void split(std::vector<arma::uword>& sortedIndices,
+					arma::mat& points, size_t currentNodeIndex,
+					size_t dimSplit);
 
 		private:
-			size_t dim = 0;
+			arma::uword dim = 0;
+			size_t n_leafs = 0;
 
 			std::deque<node> nodes; // deque to avoid reallocating the underlying array several times
 			// as the struct node might potentially be a large datatype.
