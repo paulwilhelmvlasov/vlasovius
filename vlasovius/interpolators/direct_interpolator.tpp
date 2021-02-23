@@ -44,65 +44,63 @@ K { p_K }, X { std::move(p_X) }, coeff { std::move(b) }
 			                       "Number of points does not match value data vector length." };
 	}
 
-	size_t n = X.n_rows;
+	const size_t n = X.n_rows, dim = X.n_cols, ldX  = n;
+	const size_t ar_rows = (n & 1) ?  (n      ) : (n+1);
+	const size_t ar_cols = (n & 1) ?  (n/2 + 1) : (n/2);
 
-	using arma::span;
-	arma::mat V(n,n);
-	constexpr size_t block_size = 64;
-	size_t num_blocks = n/block_size;
+	// AR is stored in Rectangular Full Packed Format (RFPF)
+	// See reference [gstv2010]
+	arma::mat AR( ar_rows, ar_cols );
 
 	misc::stopwatch clock;
-
-	arma::mat buf(block_size,block_size);
-
-	#pragma omp for schedule(dynamic)
-	for ( size_t i_block = 0; i_block < num_blocks; ++i_block )
+	if ( n & 1 )
 	{
-		for ( size_t j_block = 0; j_block <= i_block; ++j_block )
-		{
-			size_t i_begin = i_block*block_size, i_end = i_begin + block_size - 1;
-			size_t j_begin = j_block*block_size, j_end = j_begin + block_size - 1;
+		// First column
+		K.eval( dim, n, 1, &AR(0,0), ar_rows, &X(0,0), ldX, &X(0,0), ldX );
 
-			V( span(i_begin,i_end), span(j_begin,j_end) ) = K( X(span(i_begin,i_end), span(0,X.n_cols-1) ),
-															   X(span(j_begin,j_end), span(0,X.n_cols-1) ));
+		// Remaining columns.
+		#pragma omp parallel for
+		for ( size_t j = 1; j < ar_cols; ++j )
+		{
+			// Upper part of column
+			K.eval( dim, j, 1, &AR(0,j), ar_rows, &X(n/2+1,0), ldX, &X(n/2+j,0), ldX );
+
+			// Lower part of column
+			K.eval( dim, n-j, 1, &AR(j,j), ar_rows, &X(j,0), ldX, &X(j,0), ldX );
+			AR(j,j) += tikhonov_mu;
 		}
 	}
+	else
+	{
+		#pragma omp parallel for
+		for ( size_t j = 0; j < ar_cols; ++j )
+		{
+			// Upper part of column j
+			K.eval( dim, j+1, 1, &AR(0,j), ar_rows, &X(n/2,0), ldX, &X(n/2+j,0), ldX );
 
-
-	size_t i_begin = num_blocks*block_size, i_end = n-1;
-	V( span(i_begin,i_end), span(0,n-1) ) = K( X(span(i_begin,i_end), span(0,X.n_cols-1) ),
-			                                   X(span(0,n-1), span(0,X.n_cols-1) ));
-
-	V.diag() += tikhonov_mu * arma::vec( X.n_rows, arma::fill::ones );
+			// Lower part of column j
+			K.eval( dim, n-j, 1, &AR(j+1,j), ar_rows, &X(j,0), ldX, &X(j,0), ldX );
+			AR(j+1,j) += tikhonov_mu;
+		}
+	}
 	double elapsed = clock.elapsed();
 	std::cout << "Time for matrix assembly: " << elapsed << ".\n";
 
-
 	clock.reset();
-	// Compute Cholesky decomposition V = L * L^T.
-	lapack_int info;
-	info = LAPACKE_dpotrf( LAPACK_COL_MAJOR, 'L', n, V.memptr(), n );
+	lapack_int info = LAPACKE_dpftrf( LAPACK_COL_MAJOR, 'N', 'L', n, AR.memptr() );
 	if ( info )
 	{
 		throw std::runtime_error { "vlasovius::direct_interpolator::direct_interpolator(): "
-			                       "Error while computing Cholesky factorisation of Vandermonde matrix." };
+		                           "Error while computing Cholesky factorisation of Vandermonde matrix." };
 	}
 
-	// Solve Ly = b; We already initialised coeff with b.
-	info = LAPACKE_dtrtrs( LAPACK_COL_MAJOR, 'L', 'N', 'N', n, 1, V.memptr(), n, coeff.memptr(), n );
+	info = LAPACKE_dpftrs( LAPACK_COL_MAJOR, 'N', 'L', n, 1, AR.memptr(), coeff.memptr(), n );
 	if ( info )
 	{
 		throw std::runtime_error { "vlasovius::direct_interpolator::direct_interpolator(): "
-			                       "Error while solving triangular system Ly = b." };
+				                   "Error while solving triangular systems L^Tx = y, Ly = b." };
 	}
 
-	// Solve L^T x = y;
-	info = LAPACKE_dtrtrs( LAPACK_COL_MAJOR, 'L', 'T', 'N', n, 1, V.memptr(), n, coeff.memptr(), n );
-	if ( info )
-	{
-		throw std::runtime_error { "vlasovius::direct_interpolator::direct_interpolator(): "
-			                       "Error while solving triangular system L^Tx = y." };
-	}
 	elapsed = clock.elapsed();
 	std::cout << "Time for solving: " << elapsed << ".\n";
 }

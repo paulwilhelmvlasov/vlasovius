@@ -1,5 +1,12 @@
 Books and papers that we reference in comments of the source code.
 
-[wend2005] Holger Wendland. "Scattered Data Approximation". Nr. 17 of
+[wend2005] Holger Wendland. ‘Scattered Data Approximation’. Nr. 17 of
            Cambridge Monographs on Applied and Computational Mathematics.
            Cambridge University Press 2005. ISBN: 978-0-521-84335-5.
+           
+[gstv2010] Fred G. Gustavson, Fred G. Gustavson, Jerzy Waśniewski,
+           Jack J. Dongarra, and Julien Langou. ‘Rectangular Full Packed
+           Format for Cholesky’s Algorithm: Factorization, Solution, and
+           Inversion’.
+           In: ACM Transactions on Mathematical Software 37.2 (April 2010)
+           DOI: 10.1145/1731022.1731028

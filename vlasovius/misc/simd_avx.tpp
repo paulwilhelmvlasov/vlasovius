@@ -35,9 +35,9 @@ public:
 	simd& operator=( const simd&  ) noexcept = default;
 	simd& operator=(       simd&& ) noexcept = default;
 
-	simd( double* data ) noexcept: v { _mm256_loadu_pd( data ) } {}
-	simd( double  data ) noexcept: v { _mm256_set1_pd ( data ) } {}
-	simd( __m256d data ) noexcept: v { data }                    {}
+	simd( const double* data ) noexcept: v { _mm256_loadu_pd( data ) } {}
+	simd(       double  data ) noexcept: v { _mm256_set1_pd ( data ) } {}
+	simd(       __m256d data ) noexcept: v { data }                    {}
 
 
 	static constexpr size_t size() noexcept { return 4; }
@@ -167,6 +167,18 @@ inline
 simd_avx_double min( simd_avx_double v1, simd_avx_double v2 ) noexcept
 {
 	return _mm256_min_pd(v1.v,v2.v);
+}
+
+inline
+simd_avx_double floor( simd_avx_double v ) noexcept
+{
+	return _mm256_floor_pd( v.v );
+}
+
+inline
+simd_avx_double ceil( simd_avx_double v ) noexcept
+{
+	return _mm256_ceil_pd( v.v );
 }
 
 }

@@ -206,6 +206,19 @@ simd_scalar_double min( simd_scalar_double v1, simd_scalar_double v2 ) noexcept
 	return std::min(v1.v,v2.v);
 }
 
+inline
+simd_scalar_double floor( simd_scalar_double v ) noexcept
+{
+	return std::floor(v.v);
+}
+
+inline
+simd_scalar_double ceil( simd_scalar_double v ) noexcept
+{
+	return std::ceil(v.v);
+}
+
+
 }
 
 }

@@ -17,8 +17,6 @@
  * vlasovius; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
 
-#include <immintrin.h>
-
 namespace vlasovius
 {
 
@@ -41,7 +39,7 @@ arma::mat rbf_kernel<rbf_function>::operator()( const arma::mat &X,
 	}
 	const size_t N { X.n_rows }, M { Y.n_rows }, dim { Y.n_cols };
 	arma::mat result( N, M );
-	eval( dim, N, M, result.memptr(), N, X.memptr(), dim, Y.memptr(), dim );
+	eval( dim, N, M, result.memptr(), N, X.memptr(), N, Y.memptr(), M );
 	return result;
 
 }
@@ -52,7 +50,7 @@ void rbf_kernel<rbf_function>::eval( size_t dim, size_t n, size_t m,
 		                             const double        *X, size_t ldX,
 									 const double        *Y, size_t ldY ) const
 {
-	using simd_t = ::vlasovius::misc::simd<double>;
+	using simd_t = typename rbf_function::simd_type;
 
 	#pragma omp parallel for
 	for ( size_t j = 0; j < m; ++j )
@@ -62,11 +60,11 @@ void rbf_kernel<rbf_function>::eval( size_t dim, size_t n, size_t m,
 		if constexpr ( simd_t::size() > 1 )
 		{
 			simd_t x, y, r;
-			y.fill(Y + j);
-			for ( ; i + simd_t::size() < n; i += simd_t::size()  )
+			for ( ; i + simd_t::size() < n; i += simd_t::size() )
 			{
+				y.fill(Y + j);
 				x.load(X + i);
-				simd_t r = abs(x-y);
+				r = abs(x-y);
 
 				if ( dim > 1 )
 				{
@@ -74,7 +72,7 @@ void rbf_kernel<rbf_function>::eval( size_t dim, size_t n, size_t m,
 					for ( size_t d = 1; d < dim; ++d )
 					{
 						x.load(X + i + d*ldX);
-						y.fill(X + j + d*ldY);
+						y.fill(Y + j + d*ldY);
 						r = fmadd(x-y,x-y,r);
 					}
 					r = sqrt(r);

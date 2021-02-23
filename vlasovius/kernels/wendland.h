@@ -32,6 +32,9 @@ template <size_t dim, size_t k, typename simd_t = ::vlasovius::misc::simd<double
 class wendland
 {
 public:
+
+	using simd_type = simd_t;
+
 	wendland();
 
 	// Copies sometimes could make sense, when passing a kernel by value and

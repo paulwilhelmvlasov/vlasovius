@@ -39,7 +39,7 @@ public:
     periodic_poisson_1d( double a, double b, int N );
 
     arma::vec quadrature_nodes();
-    void update_rho( const arma::vec &rho_at_quadrature_nodes );
+    double update_rho( const arma::vec &rho_at_quadrature_nodes );
 
     double E( double x );
 
@@ -366,12 +366,12 @@ arma::vec periodic_poisson_1d<order>::quadrature_nodes()
 }
 
 template <int order>
-void periodic_poisson_1d<order>::update_rho( const arma::vec &rho_at_quadrature_nodes )
+double periodic_poisson_1d<order>::update_rho( const arma::vec &rho_at_quadrature_nodes )
 {
     double h = (b-a)/N;
     arma::vec::fixed<order> elemb;
 
-    coeffs.zeros();
+    arma::vec b( coeffs.n_rows, arma::fill::zeros );
     auto rule = get_quad_rule<order>();
     for ( int cell = 0; cell < N; ++cell )
     {
@@ -390,10 +390,11 @@ void periodic_poisson_1d<order>::update_rho( const arma::vec &rho_at_quadrature_
 
         auto nums = cell_dof_numbers(cell);
         for ( int i = 0; i < order; ++i )
-            coeffs(nums[i]) += elemb[i];
+            b(nums[i]) += elemb[i];
     }
 
-    coeffs = A * coeffs;
+    coeffs = A * b;
+    return dot( coeffs, b );
 }
 
 template <int order>
