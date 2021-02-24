@@ -24,12 +24,11 @@
 
 int main()
 {
-
 	constexpr size_t dim { 2 }, k { 4 };
-	constexpr size_t N { 100000 };
-	constexpr double tikhonov_mu { 1e-9 };
-	constexpr size_t min_per_box = 500;
-	constexpr size_t max_per_box = 1000;
+	constexpr size_t N { 1000 };
+	constexpr double tikhonov_mu { 1e-20 };
+	constexpr size_t min_per_box = 200;
+	constexpr size_t max_per_box = 300;
 	constexpr double enlarge = 1.5;
 	constexpr double twopi { 2*3.1415926535 };
 
@@ -51,9 +50,40 @@ int main()
 	}
 
 	vlasovius::misc::stopwatch clock;
-	interpolator_t sfx { kernel_t {}, X, f, tikhonov_mu, min_per_box, max_per_box, enlarge};
+	interpolator_t sfx { kernel_t {wendland_t(), 0.1}, X, f, tikhonov_mu, min_per_box, max_per_box, enlarge};
 	double elapsed { clock.elapsed() };
 	std::cout << "Time for computing RBF-Approximation: " << elapsed << ".\n";
+	std::cout << "Maximal interpolation error: " << norm(f-sfx(X),"inf") << ".\n";
+
+	arma::mat plotX( 101*101, 2 );
+	arma::vec plotf_true( 101*101 );
+	for ( size_t i = 0; i <= 100; ++i )
+		for ( size_t j = 0; j <= 100; ++j )
+		{
+			double x = plotX(j + 101*i,0) = i/100.;
+			double y = plotX(j + 101*i,1) = j/100.;
+			plotf_true(j + 101*i) = std::sin(twopi*x)*std::sin(twopi*y);
+		}
+
+	clock.reset();
+	arma::vec plotf = sfx(plotX);
+	elapsed = clock.elapsed();
+	std::cout << "Time for evaluating RBF-approximation at plotting points: " << elapsed << ".\n";
+	std::cout << "Maximum encountered error at plotting points: " << norm(plotf-plotf_true,"inf") << ".\n";
+
+	std::ofstream str( "test_direct_interpolator.txt" );
+	for ( size_t i = 0; i <= 100; ++i )
+	{
+		for ( size_t j = 0; j <= 100; ++j )
+		{
+			double x = plotX(j + 101*i,0);
+			double y = plotX(j + 101*i,1);
+			double err  = plotf(j+101*i)-plotf_true(j+101*i);
+			str << x << " " << y << " " << err << std::endl;
+		}
+		str << "\n";
+	}
+
 
 	return 0;
 }

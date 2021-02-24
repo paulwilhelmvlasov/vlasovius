@@ -84,7 +84,7 @@ K { p_K }, X { std::move(p_X) }, coeff { std::move(b) }
 		}
 	}
 	double elapsed = clock.elapsed();
-	std::cout << "Time for matrix assembly: " << elapsed << ".\n";
+	//std::cout << "Time for matrix assembly: " << elapsed << ".\n";
 
 	clock.reset();
 	lapack_int info = LAPACKE_dpftrf( LAPACK_COL_MAJOR, 'N', 'L', n, AR.memptr() );
@@ -102,7 +102,7 @@ K { p_K }, X { std::move(p_X) }, coeff { std::move(b) }
 	}
 
 	elapsed = clock.elapsed();
-	std::cout << "Time for solving: " << elapsed << ".\n";
+	//std::cout << "Time for solving: " << elapsed << ".\n";
 }
 
 template <typename kernel>

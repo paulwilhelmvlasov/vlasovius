@@ -171,7 +171,7 @@ void vlasovius::interpolators::pou_interpolator<kernel>::construct_sub_sfx(arma:
 	}
 
 	double elapsed { clock.elapsed() };
-	std::cout << "Time for computing PoU-Interpolant-Approximation: " << elapsed << ".\n";
+	std::cout << "Time for constructing pou after tree is build: " << elapsed << ".\n";
 }
 
 template <typename kernel>
@@ -187,7 +187,7 @@ arma::vec vlasovius::interpolators::pou_interpolator<kernel>::operator()( const 
 		w[i] = tree.whichLeafContains(Y.row(i));
 		if(w[i] < 0){
 			sizes_sub_matrices[n_submat - 1]++;
-			w[i] = n_submat;
+			w[i] = n_submat - 1;
 		} else {
 			sizes_sub_matrices[w[i]]++;
 		}
@@ -217,20 +217,23 @@ arma::vec vlasovius::interpolators::pou_interpolator<kernel>::operator()( const 
 
 	// Now evaluate for each sub-matrix:
 	std::vector<arma::vec> sub_r(n_submat);
-	sub_r[n_submat] = arma::vec(sizes_sub_matrices[n_submat - 1], arma::fill::zeros);
+	sub_r[n_submat - 1] = arma::vec(sizes_sub_matrices[n_submat - 1], arma::fill::zeros);
 	for(size_t i = 0; i < n_submat - 1; i++){
 		// The formula is now:
 		// f(x) = sum_{i in containingBoxes} f[i](x) * w[i](x) / (sum_{i in containingBoxes} w[i](x) )
-		arma::vec denominator(sizes_sub_matrices[i], arma::fill::zeros);
-		arma::vec nominator(sizes_sub_matrices[i], arma::fill::zeros);
-
-		for(size_t j: domains_intersect_leafs[i])
+		if(sizes_sub_matrices[i] > 0)
 		{
-			nominator   += sub_sfx[j](sub_matrix[i]) % weight_fcts[j](sub_domains[j].center, sub_matrix[i]);
-			denominator += weight_fcts[j](sub_domains[j].center, sub_matrix[i]);
-		}
+			arma::vec denominator(sizes_sub_matrices[i], arma::fill::zeros);
+			arma::vec nominator(sizes_sub_matrices[i], arma::fill::zeros);
 
-		sub_r[i] = nominator / denominator;
+			for(size_t j: domains_intersect_leafs[i])
+			{
+				nominator   += sub_sfx[j](sub_matrix[i]) % weight_fcts[j](sub_domains[j].center, sub_matrix[i]);
+				denominator += weight_fcts[j](sub_domains[j].center, sub_matrix[i]);
+			}
+
+			sub_r[i] = nominator / denominator;
+		}
 	}
 
 

@@ -25,6 +25,7 @@
 #include <vlasovius/kernels/rbf_kernel.h>
 #include <vlasovius/kernels/periodised_kernel.h>
 #include <vlasovius/interpolators/direct_interpolator.h>
+#include <vlasovius/interpolators/pou_interpolator.h>
 #include <vlasovius/misc/periodic_poisson_1d.h>
 
 namespace vlasovius
@@ -283,6 +284,7 @@ int main()
 
 		double elapsed = clock.elapsed();
 		std::cout << "Time for needed for time-step: " << elapsed << ".\n";
+		std::cout << "---------------------------------------" << elapsed << ".\n";
 
 		if ( t + dt > T ) dt = T - t;
 	}
