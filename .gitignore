@@ -30,12 +30,8 @@ ltmain.sh
 m4/libtool.m4
 m4/lt*.m4
 /compile
-bin/test_wendland.exe.stackdump
-bin/test_wendland.txt
-bin/direct_vlasov_1d_periodic
-bin/test_direct_interpolator
-bin/test_pou_interpolator
-bin/test_wendland
+bin/*
+!bin/*.cpp
+!bin/makefile.am
 test_direct_interpolator.txt
-
 /build/

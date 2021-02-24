@@ -40,10 +40,16 @@ public:
 	void eval( size_t dim, size_t n, size_t m,
 			   double *__restrict__ K, size_t ldK,
 	           const double        *X, size_t ldX,
-	           const double        *Y, size_t ldY ) const;
+	           const double        *Y, size_t ldY, size_t num_threads = 1 ) const;
 
 
 private:
+
+	void eval_column( size_t dim, size_t n, size_t m, size_t j,
+			          double *__restrict__ K, size_t ldK,
+	                  const double        *X, size_t ldX,
+	                  const double        *Y, size_t ldY ) const;
+
 	rbf_function F   {};
 	double inv_sigma {1};
 };

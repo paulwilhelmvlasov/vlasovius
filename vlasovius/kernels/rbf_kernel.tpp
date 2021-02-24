@@ -48,61 +48,77 @@ template <typename rbf_function>
 void rbf_kernel<rbf_function>::eval( size_t dim, size_t n, size_t m,
 		                             double *__restrict__ K, size_t ldK,
 		                             const double        *X, size_t ldX,
-									 const double        *Y, size_t ldY ) const
+									 const double        *Y, size_t ldY, size_t threads ) const
+{
+	if ( threads > 1 )
+	{
+		#pragma omp parallel for num_threads(threads)
+		for ( size_t j = 0; j < m; ++j )
+			eval_column( dim, n, m, j, K, ldK, X, ldX, Y, ldY );
+	}
+	else
+	{
+		for ( size_t j = 0; j < m; ++j )
+			eval_column( dim, n, m, j, K, ldK, X, ldX, Y, ldY );
+	}
+}
+
+template <typename rbf_function>
+void rbf_kernel<rbf_function>::eval_column( size_t dim, size_t n, size_t m, size_t j,
+		                                    double *__restrict__ K, size_t ldK,
+		                                    const double        *X, size_t ldX,
+									        const double        *Y, size_t ldY ) const
 {
 	using simd_t = typename rbf_function::simd_type;
 
-	#pragma omp parallel for
-	for ( size_t j = 0; j < m; ++j )
+	size_t i = 0;
+
+	if constexpr ( simd_t::size() > 1 )
 	{
-		size_t i = 0;
-
-		if constexpr ( simd_t::size() > 1 )
+		simd_t x, y, r;
+		for ( ; i + simd_t::size() < n; i += simd_t::size() )
 		{
-			simd_t x, y, r;
-			for ( ; i + simd_t::size() < n; i += simd_t::size() )
-			{
-				y.fill(Y + j);
-				x.load(X + i);
-				r = abs(x-y);
-
-				if ( dim > 1 )
-				{
-					r = r*r;
-					for ( size_t d = 1; d < dim; ++d )
-					{
-						x.load(X + i + d*ldX);
-						y.fill(Y + j + d*ldY);
-						r = fmadd(x-y,x-y,r);
-					}
-					r = sqrt(r);
-				}
-				r = F(r*inv_sigma);
-				r.store( K + i + j*ldK );
-			}
-		}
-
-		for ( ; i < n; ++i )
-		{
-			double x = X[i];
-			double y = Y[j];
-			double r = std::abs(x-y);
+			y.fill(Y + j);
+			x.load(X + i);
+			r = abs(x-y);
 
 			if ( dim > 1 )
 			{
 				r = r*r;
 				for ( size_t d = 1; d < dim; ++d )
 				{
-					x = X[ i + d*ldX ];
-					y = Y[ j + d*ldY ];
-					r = std::fma(x-y,x-y,r);
+					x.load(X + i + d*ldX);
+					y.fill(Y + j + d*ldY);
+					r = fmadd(x-y,x-y,r);
 				}
 				r = sqrt(r);
 			}
-			K[ i + j*ldK ] = F(r*inv_sigma);
+			r = F(r*inv_sigma);
+			r.store( K + i + j*ldK );
 		}
 	}
+
+	for ( ; i < n; ++i )
+	{
+		double x = X[i];
+		double y = Y[j];
+		double r = std::abs(x-y);
+
+		if ( dim > 1 )
+		{
+			r = r*r;
+			for ( size_t d = 1; d < dim; ++d )
+			{
+				x = X[ i + d*ldX ];
+				y = Y[ j + d*ldY ];
+				r = std::fma(x-y,x-y,r);
+			}
+			r = sqrt(r);
+		}
+		K[ i + j*ldK ] = F(r*inv_sigma);
+	}
 }
+
 
 }
 

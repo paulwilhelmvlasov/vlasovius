@@ -32,9 +32,10 @@ template <typename kernel>
 class direct_interpolator
 {
 public:
-	direct_interpolator( kernel K, arma::mat X, arma::vec b, double tikhonov_mu = 0 );
+	direct_interpolator( kernel K, arma::mat X, arma::vec b,
+			             double tikhonov_mu = 0, size_t threads = 1 );
 
-	arma::vec operator()( const arma::mat &Y ) const;
+	arma::vec operator()( const arma::mat &Y, size_t threads = 1 ) const;
 	arma::vec coeffs() const { return coeff; }
 
 private:

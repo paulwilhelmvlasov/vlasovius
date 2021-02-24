@@ -19,8 +19,6 @@
 
 #include <lapacke.h>
 
-#include <vlasovius/misc/stopwatch.h>
-
 namespace vlasovius
 {
 
@@ -29,7 +27,7 @@ namespace interpolators
 
 template <typename kernel>
 direct_interpolator<kernel>::direct_interpolator
-( kernel p_K, arma::mat p_X, arma::vec b, double tikhonov_mu ):
+( kernel p_K, arma::mat p_X, arma::vec b, double tikhonov_mu, size_t threads ):
 K { p_K }, X { std::move(p_X) }, coeff { std::move(b) }
 {
 	if ( X.empty() )
@@ -52,44 +50,76 @@ K { p_K }, X { std::move(p_X) }, coeff { std::move(b) }
 	// See reference [gstv2010]
 	arma::mat AR( ar_rows, ar_cols );
 
-	misc::stopwatch clock;
 	if ( n & 1 )
 	{
 		// First column
 		K.eval( dim, n, 1, &AR(0,0), ar_rows, &X(0,0), ldX, &X(0,0), ldX );
+		AR(0,0) += tikhonov_mu;
 
 		// Remaining columns.
-		#pragma omp parallel for
-		for ( size_t j = 1; j < ar_cols; ++j )
+		if ( threads > 1 )
 		{
-			// Upper part of column
-			K.eval( dim, j, 1, &AR(0,j), ar_rows, &X(n/2+1,0), ldX, &X(n/2+j,0), ldX );
+			#pragma omp parallel for num_threads(threads)
+			for ( size_t j = 1; j < ar_cols; ++j )
+			{
+				// Upper part of column
+				K.eval( dim, j, 1, &AR(0,j), ar_rows, &X(n/2+1,0), ldX, &X(n/2+j,0), ldX );
+				AR(j-1,j) += tikhonov_mu;
 
-			// Lower part of column
-			K.eval( dim, n-j, 1, &AR(j,j), ar_rows, &X(j,0), ldX, &X(j,0), ldX );
-			AR(j,j) += tikhonov_mu;
+				// Lower part of column
+				K.eval( dim, n-j, 1, &AR(j,j), ar_rows, &X(j,0), ldX, &X(j,0), ldX );
+				AR(j,j) += tikhonov_mu;
+			}
+		}
+		else
+		{
+			for ( size_t j = 1; j < ar_cols; ++j )
+			{
+				// Upper part of column
+				K.eval( dim, j, 1, &AR(0,j), ar_rows, &X(n/2+1,0), ldX, &X(n/2+j,0), ldX );
+				AR(j-1,j) += tikhonov_mu;
+
+				// Lower part of column
+				K.eval( dim, n-j, 1, &AR(j,j), ar_rows, &X(j,0), ldX, &X(j,0), ldX );
+				AR(j,j) += tikhonov_mu;
+			}
 		}
 	}
 	else
 	{
-		#pragma omp parallel for
-		for ( size_t j = 0; j < ar_cols; ++j )
+		if ( threads > 1 )
 		{
-			// Upper part of column j
-			K.eval( dim, j+1, 1, &AR(0,j), ar_rows, &X(n/2,0), ldX, &X(n/2+j,0), ldX );
+			#pragma omp parallel for num_threads(threads)
+			for ( size_t j = 0; j < ar_cols; ++j )
+			{
+				// Upper part of column j
+				K.eval( dim, j+1, 1, &AR(0,j), ar_rows, &X(n/2,0), ldX, &X(n/2+j,0), ldX );
+				AR(j,j) += tikhonov_mu;
 
-			// Lower part of column j
-			K.eval( dim, n-j, 1, &AR(j+1,j), ar_rows, &X(j,0), ldX, &X(j,0), ldX );
-			AR(j+1,j) += tikhonov_mu;
+				// Lower part of column j
+				K.eval( dim, n-j, 1, &AR(j+1,j), ar_rows, &X(j,0), ldX, &X(j,0), ldX );
+				AR(j+1,j) += tikhonov_mu;
+			}
+		}
+		else
+		{
+			for ( size_t j = 0; j < ar_cols; ++j )
+			{
+				// Upper part of column j
+				K.eval( dim, j+1, 1, &AR(0,j), ar_rows, &X(n/2,0), ldX, &X(n/2+j,0), ldX );
+				AR(j,j) += tikhonov_mu;
+
+				// Lower part of column j
+				K.eval( dim, n-j, 1, &AR(j+1,j), ar_rows, &X(j,0), ldX, &X(j,0), ldX );
+				AR(j+1,j) += tikhonov_mu;
+			}
 		}
 	}
-	double elapsed = clock.elapsed();
-	//std::cout << "Time for matrix assembly: " << elapsed << ".\n";
 
-	clock.reset();
 	lapack_int info = LAPACKE_dpftrf( LAPACK_COL_MAJOR, 'N', 'L', n, AR.memptr() );
 	if ( info )
 	{
+		std::cout << "LAPACK packed info: " << info << ", n = " << n << std::endl;
 		throw std::runtime_error { "vlasovius::direct_interpolator::direct_interpolator(): "
 		                           "Error while computing Cholesky factorisation of Vandermonde matrix." };
 	}
@@ -100,13 +130,10 @@ K { p_K }, X { std::move(p_X) }, coeff { std::move(b) }
 		throw std::runtime_error { "vlasovius::direct_interpolator::direct_interpolator(): "
 				                   "Error while solving triangular systems L^Tx = y, Ly = b." };
 	}
-
-	elapsed = clock.elapsed();
-	//std::cout << "Time for solving: " << elapsed << ".\n";
 }
 
 template <typename kernel>
-arma::vec direct_interpolator<kernel>::operator()( const arma::mat &Y ) const
+arma::vec direct_interpolator<kernel>::operator()( const arma::mat &Y, size_t threads ) const
 {
 	if ( Y.empty() )
 	{
@@ -120,7 +147,36 @@ arma::vec direct_interpolator<kernel>::operator()( const arma::mat &Y ) const
 		                           "Evaluation and Interpolation points have differing dimensions." };
 	}
 
-	return K(Y,X)*coeff;
+	size_t dim = X.n_cols, n = Y.n_rows, m = X.n_rows;
+	arma::vec result( Y.n_rows, arma::fill::zeros );
+
+	if ( threads > 1)
+	{
+		#pragma omp parallel num_threads(threads)
+		{
+			arma::vec tmp( Y.n_rows ), thread_sum( Y.n_rows, arma::fill::zeros );
+
+			#pragma omp for
+			for ( size_t i = 0; i < X.n_rows; ++i )
+			{
+				K.eval( dim, n, 1, tmp.memptr(), n, Y.memptr(), n, &X(i,0), m );
+				thread_sum += tmp*coeff(i);
+			}
+
+			#pragma omp critical
+			result += thread_sum;
+		}
+	}
+	else
+	{
+		arma::vec tmp( Y.n_rows );
+		for ( size_t i = 0; i < X.n_rows; ++i )
+		{
+			K.eval( dim, n, 1, tmp.memptr(), n, Y.memptr(), n, &X(i,0), m );
+			result += tmp*coeff(i);
+		}
+	}
+	return result;
 }
 
 }
