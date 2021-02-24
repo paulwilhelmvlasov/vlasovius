@@ -28,13 +28,20 @@ namespace vlasovius
 
 		bool subset(const bounding_box& first, const bounding_box& second)
 		{
-			// For performance I do not check on size-compatibility:
-			size_t d = second.center.size();
-
-			for(long i = 0; i < d; i++)
+			#ifndef NDEBUG
+			if ( first.center.size() != second.center.size() )
 			{
-				if( (first.center(i) + first.sidelength(i) > second.center(i) + second.sidelength(i))
-				  || (first.center(i) - first.sidelength(i) < second.center(i) - second.sidelength(i)) )
+				throw std::runtime_error { "vlasovius::trees::intersects: "
+										   "Comparison of boxes of differing dimension." };
+			}
+			#endif
+
+			const arma::uword dim { second.center.size() };
+			for( arma::uword d = 0; d < dim; ++d )
+			{
+				double dist = std::abs(first.center(d) - second.center(d)) -
+									  (first.sidelength(d) + second.sidelength(d));
+				if ( dist > 0 )
 				{
 					return false;
 				}
@@ -47,7 +54,7 @@ namespace vlasovius
 		{
 			size_t d = second.center.size();
 
-			for(long i = 0; i < d; i++)
+			for(size_t i = 0; i < d; i++)
 			{
 				double dist = std::abs(first.center(i) - second.center(i));
 				if( dist <= first.sidelength(i) || dist <= second.sidelength(i) )
