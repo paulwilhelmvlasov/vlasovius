@@ -25,10 +25,10 @@
 int main()
 {
 	constexpr size_t dim { 2 }, k { 4 };
-	constexpr size_t N { 10000 };
+	constexpr size_t N { 1000 };
 	constexpr double tikhonov_mu { 1e-9 };
-	constexpr size_t min_per_box = 200;
-	constexpr size_t max_per_box = 400;
+	constexpr size_t min_per_box = 100;
+	constexpr size_t max_per_box = 200;
 	constexpr double enlarge = 1.5;
 	constexpr double twopi { 2*3.1415926535 };
 
@@ -71,7 +71,7 @@ int main()
 	std::cout << "Time for evaluating RBF-approximation at plotting points: " << elapsed << ".\n";
 	std::cout << "Maximum encountered error at plotting points: " << norm(plotf-plotf_true,"inf") << ".\n";
 
-	std::ofstream str( "test_direct_interpolator.txt" );
+	std::ofstream str( "test_pou_interpolator.txt" );
 	for ( size_t i = 0; i <= 100; ++i )
 	{
 		for ( size_t j = 0; j <= 100; ++j )

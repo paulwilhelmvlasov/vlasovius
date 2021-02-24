@@ -231,8 +231,12 @@ arma::vec vlasovius::interpolators::pou_interpolator<kernel>::operator()( const 
 				nominator   += sub_sfx[i_dom](sub_matrix[i_leaf])
 						% weight_fcts[i_dom](sub_matrix[i_leaf], sub_domains[i_dom].center);
 				denominator += weight_fcts[i_dom](sub_matrix[i_leaf], sub_domains[i_dom].center);
+
+				std::cout << sub_matrix[i_leaf] << std::endl;
+				std::cout << sub_domains[i_dom].center << std::endl;
 			}
 
+			//std::cout << denominator << std::endl;
 			sub_r[i_leaf] = nominator / denominator;
 		}
 	}

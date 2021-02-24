@@ -28,6 +28,8 @@ int main()
 	arma::mat points(N, 2, arma::fill::randu);
 	arma::vec rhs(N, arma::fill::randu);
 
+	std::cout << points << std::endl;
+
 	vlasovius::misc::stopwatch watch;
 	vlasovius::trees::kd_tree baum(points, rhs, 10, 20);
 	double zeit = watch.elapsed();
@@ -44,8 +46,12 @@ int main()
 		std::cout << "Leaf " << j << " contains " << test_points.row(i) << std::endl;
 	}
 
-	std::cout << baum.getNode(0).box.center << std::endl;
-	std::cout << baum.getNode(0).box.sidelength << std::endl;
+	for(size_t i = 0; i < baum.getNumberLeafs(); i++)
+	{
+		std::cout << "Leaf " << i << std::endl;
+		std::cout << baum.getLeaf(i).box.center << std::endl;
+		std::cout << baum.getLeaf(i).box.sidelength << std::endl;
+	}
 
 	return 0;
 }

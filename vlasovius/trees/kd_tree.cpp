@@ -169,9 +169,12 @@ namespace vlasovius
 				nodes[firstChild].box  = nodes[currentNodeIndex].box;
 				nodes[secondChild].box = nodes[currentNodeIndex].box;
 
-				double lowerBorder = points.row(nodes[firstChild].indexFirstElem)(dimSplit);
+				double lowerBorder = nodes[currentNodeIndex].box.center(dimSplit)
+						- nodes[currentNodeIndex].box.sidelength(dimSplit);
 				double splitValue  = points.row(nodes[firstChild].indexLastElem - 1)(dimSplit);
-				double upperBorder = points.row(nodes[secondChild].indexLastElem - 1)(dimSplit);
+				// Is the split value correct?
+				double upperBorder = nodes[currentNodeIndex].box.center(dimSplit)
+								+ nodes[currentNodeIndex].box.sidelength(dimSplit);
 
 				double firstSideLength  = (splitValue - lowerBorder) / 2.0;
 				double secondSideLength = (upperBorder - splitValue) / 2.0;
@@ -274,6 +277,11 @@ namespace vlasovius
 		node kd_tree::getNode(size_t i) const
 		{
 			return nodes.at(i);
+		}
+
+		node kd_tree::getLeaf(size_t i) const
+		{
+			return nodes[indices_leafs.at(i)];
 		}
 
 		int kd_tree::whichLeafContains(const arma::rowvec& p) const
