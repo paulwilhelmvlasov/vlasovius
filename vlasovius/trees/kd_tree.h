@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <deque>
 #include <iostream>
+#include <map>
 
 #include <armadillo>
 
@@ -98,6 +99,7 @@ namespace vlasovius
 			std::deque<node> nodes; // deque to avoid reallocating the underlying array several times
 			// as the struct node might potentially be a large datatype.
 			std::vector<size_t> indices_leafs;
+			std::map<size_t, size_t> node_index_leaf_index;
 		};
 
 	}

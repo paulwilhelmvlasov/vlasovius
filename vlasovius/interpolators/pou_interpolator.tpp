@@ -190,7 +190,6 @@ arma::vec vlasovius::interpolators::pou_interpolator<kernel>::operator()( const 
 			w[i] = n_submat - 1;
 		} else {
 			sizes_sub_matrices[w[i]]++;
-			// w[i] ist der Index des Blatts aber nicht der Index der Submatrix...
 		}
 	}
 

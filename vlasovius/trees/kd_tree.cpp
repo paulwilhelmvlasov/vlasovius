@@ -86,6 +86,7 @@ namespace vlasovius
 			for(size_t i = 0; i < nodes.size(); i++){
 				if(nodes[i].isLeaf()){
 					indices_leafs.push_back(i);
+					node_index_leaf_index.insert({i, indices_leafs.size() - 1});
 				}
 			}
 
@@ -276,16 +277,17 @@ namespace vlasovius
 				int index = 0;
 				do
 				{
-					int firstChild = nodes[index].firstChild;
-					int secondChild = nodes[index].secondChild;
-					if( nodes[firstChild].box.contains(p) ){
+					int firstChild = nodes[size_t(index)].firstChild;
+					int secondChild = nodes[size_t(index)].secondChild;
+					if( nodes[size_t(firstChild)].box.contains(p) ){
 						index = firstChild;
 					} else {
 						index = secondChild;
 					}
-				} while( ! nodes[index].isLeaf() );
+				} while( ! nodes[size_t(index)].isLeaf() );
 
-				return index;
+				return node_index_leaf_index.at(size_t(index));
+				// Returns the index of the leaf (in the leaf-list).
 			}else{
 				// Passed point is not inside the tree:
 				return -1;
@@ -301,16 +303,17 @@ namespace vlasovius
 				int index = 0;
 				do
 				{
-					int firstChild = nodes[index].firstChild;
-					int secondChild = nodes[index].secondChild;
-					if( i <= nodes[firstChild].indexLastElem ){
+					int firstChild = nodes[size_t(index)].firstChild;
+					int secondChild = nodes[size_t(index)].secondChild;
+					if( i <= nodes[size_t(firstChild)].indexLastElem ){
 						index = firstChild;
 					} else {
 						index = secondChild;
 					}
-				} while( ! nodes[index].isLeaf() );
+				} while( ! nodes[size_t(index)].isLeaf() );
 
-				return index;
+				return node_index_leaf_index.at(size_t(index));
+				// Returns the index of the leaf (in the leaf-list).
 			}else{
 				// Passed point is not inside the tree:
 				return -1;
@@ -318,7 +321,7 @@ namespace vlasovius
 
 		}
 
-		std::vector<size_t> get_indices_leafs() const
+		std::vector<size_t> kd_tree::get_indices_leafs() const
 		{
 			return indices_leafs;
 		}
