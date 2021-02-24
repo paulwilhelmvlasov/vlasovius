@@ -72,13 +72,7 @@ void vlasovius::interpolators::pou_interpolator<kernel>::construct_sub_sfx(arma:
 	size_t n_nodes = tree.get_number_nodes();
 	size_t n_leafs = tree.getNumberLeafs();
 
-	indices_leafs.reserve(n_leafs);
-
-	for(size_t i = 0; i < n_nodes; i++){
-		if(tree.getNode(i).isLeaf()){
-			indices_leafs.push_back(i);
-		}
-	}
+	indices_leafs = tree.get_indices_leafs();
 
 	// Get the point-sets for each sub-sfx and compute the bounding-box. Note that
 	// I have to enlarge the boxes of each leaf such that they slightly overlap.
@@ -196,6 +190,7 @@ arma::vec vlasovius::interpolators::pou_interpolator<kernel>::operator()( const 
 			w[i] = n_submat - 1;
 		} else {
 			sizes_sub_matrices[w[i]]++;
+			// w[i] ist der Index des Blatts aber nicht der Index der Submatrix...
 		}
 	}
 

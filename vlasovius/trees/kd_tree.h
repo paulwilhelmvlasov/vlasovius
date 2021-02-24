@@ -74,6 +74,8 @@ namespace vlasovius
 			int whichLeafContains(const arma::rowvec& p) const;
 			int whichLeafContains(size_t i) const;
 
+			std::vector<size_t> get_indices_leafs() const;
+
 		private:
 
 			// Sorting after build:
@@ -95,6 +97,7 @@ namespace vlasovius
 
 			std::deque<node> nodes; // deque to avoid reallocating the underlying array several times
 			// as the struct node might potentially be a large datatype.
+			std::vector<size_t> indices_leafs;
 		};
 
 	}

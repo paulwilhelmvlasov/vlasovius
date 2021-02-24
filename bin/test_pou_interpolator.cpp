@@ -25,10 +25,10 @@
 int main()
 {
 	constexpr size_t dim { 2 }, k { 4 };
-	constexpr size_t N { 1000000 };
+	constexpr size_t N { 1000 };
 	constexpr double tikhonov_mu { 1e-9 };
-	constexpr size_t min_per_box = 400;
-	constexpr size_t max_per_box = 800;
+	constexpr size_t min_per_box = 100;
+	constexpr size_t max_per_box = 200;
 	constexpr double enlarge = 1.5;
 	constexpr double twopi { 2*3.1415926535 };
 

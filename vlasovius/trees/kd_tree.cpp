@@ -80,6 +80,15 @@ namespace vlasovius
 			buildTree(sortedIndices, points, 0, minPerBox, maxPerBox);
 
 			sortPoints(sortedIndices, points, rhs);
+
+			indices_leafs.reserve(n_leafs);
+
+			for(size_t i = 0; i < nodes.size(); i++){
+				if(nodes[i].isLeaf()){
+					indices_leafs.push_back(i);
+				}
+			}
+
 			double elapsed { clock.elapsed() };
 			std::cout << "Time for computing kd-tree: " << elapsed << ".\n";
 		}
@@ -225,7 +234,16 @@ namespace vlasovius
 
 		bool bounding_box::contains(const arma::rowvec& p) const
 		{
-			return arma::approx_equal( abs(center - p), sidelength, "reldiff", 1e-16);
+			size_t dim = p.n_cols;
+			for(size_t i = 0; i < dim; i++){
+				double dist = std::abs(center(i) - p(i));
+				if(dist > sidelength(i))
+				{
+					return false;
+				}
+			}
+
+			return true;
 		}
 
 		bool node::isLeaf() const
@@ -298,6 +316,11 @@ namespace vlasovius
 				return -1;
 			}
 
+		}
+
+		std::vector<size_t> get_indices_leafs() const
+		{
+			return indices_leafs;
 		}
 
 	}
