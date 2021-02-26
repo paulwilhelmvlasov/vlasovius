@@ -21,7 +21,7 @@
 template <size_t k>
 vlasovius::interpolators::pou_inducing_kernel<k>::pou_inducing_kernel( const arma::rowvec& sigma )
 {
-	size_t d = sigma.size();
+	size_t d = sigma.n_cols;
 	dim_kernels.reserve(d);
 
 	for(size_t i = 0; i < d; i++)
@@ -69,7 +69,6 @@ void vlasovius::interpolators::pou_interpolator<kernel>::construct_sub_sfx(arma:
 	// (Note that usually there are approximately twice as many nodes as leafs
 	// so just running through all nodes and checking on leaf-status might have
 	// the optimal run-time.)
-	size_t n_nodes = tree.get_number_nodes();
 	size_t n_leafs = tree.getNumberLeafs();
 
 	indices_leafs = tree.get_indices_leafs();
@@ -80,7 +79,7 @@ void vlasovius::interpolators::pou_interpolator<kernel>::construct_sub_sfx(arma:
 	std::vector<std::deque<arma::uword>> indices_points(n_leafs);
 	sub_domains = std::vector<vlasovius::trees::bounding_box>(n_leafs);
 
-	#pragma omp parallel for
+	//#pragma omp parallel for
 	for(size_t i = 0; i < n_leafs; i++)
 	{
 		size_t index_node = indices_leafs[i];
@@ -100,7 +99,6 @@ void vlasovius::interpolators::pou_interpolator<kernel>::construct_sub_sfx(arma:
 		// Compute new bounding-box:
 		sub_domains[i] = leaf_nd.box;
 		sub_domains[i].sidelength *= enlargement_factor;
-
 		// Find now all points intersecting the new bounding-box:
 		// Therefore first find the parent-node which completely contains the sub-domain
 		// and check child-points on intersection.
