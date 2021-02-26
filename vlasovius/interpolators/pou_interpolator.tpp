@@ -81,7 +81,7 @@ void vlasovius::interpolators::pou_interpolator<kernel>::construct_sub_sfx(arma:
 	sub_domains = std::vector<vlasovius::trees::bounding_box>(n_leafs);
 
 	#pragma omp parallel for
-	for(size_t i = 0; i < n_leafs; i++) // Can I pragma parallel for this?
+	for(size_t i = 0; i < n_leafs; i++)
 	{
 		size_t index_node = indices_leafs[i];
 		vlasovius::trees::node leaf_nd = tree.getNode(index_node);
@@ -231,12 +231,8 @@ arma::vec vlasovius::interpolators::pou_interpolator<kernel>::operator()( const 
 				nominator   += sub_sfx[i_dom](sub_matrix[i_leaf])
 						% weight_fcts[i_dom](sub_matrix[i_leaf], sub_domains[i_dom].center);
 				denominator += weight_fcts[i_dom](sub_matrix[i_leaf], sub_domains[i_dom].center);
-
-				std::cout << sub_matrix[i_leaf] << std::endl;
-				std::cout << sub_domains[i_dom].center << std::endl;
 			}
 
-			//std::cout << denominator << std::endl;
 			sub_r[i_leaf] = nominator / denominator;
 		}
 	}

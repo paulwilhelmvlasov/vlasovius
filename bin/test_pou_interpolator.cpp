@@ -78,7 +78,9 @@ int main()
 		{
 			double x = plotX(j + 101*i,0);
 			double y = plotX(j + 101*i,1);
-			double err  = plotf(j+101*i)-plotf_true(j+101*i);
+			//double err  = plotf(j+101*i)-plotf_true(j+101*i);
+			//double err  = plotf_true(j+101*i);
+			double err  = plotf(j+101*i);
 			str << x << " " << y << " " << err << std::endl;
 		}
 		str << "\n";

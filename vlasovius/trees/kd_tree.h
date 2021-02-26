@@ -55,6 +55,7 @@ namespace vlasovius
 
 			arma::uword indexFirstElem;
 			arma::uword indexLastElem;
+			// This points to the index after the last element!
 
 			bounding_box box;
 
@@ -86,11 +87,11 @@ namespace vlasovius
 
 			// Tree-build methods:
 			void buildTree(std::vector<arma::uword>& sortedIndices,
-					arma::mat& points, size_t currentNodeIndex,
+					arma::mat& points, arma::vec& rhs, size_t currentNodeIndex,
 					size_t minPerBox, size_t maxPerBox);
 			size_t splittingDimension(size_t currentNodeIndex);
 			void split(std::vector<arma::uword>& sortedIndices,
-					arma::mat& points, size_t currentNodeIndex,
+					arma::mat& points, arma::vec& rhs, size_t currentNodeIndex,
 					size_t dimSplit);
 
 		private:
