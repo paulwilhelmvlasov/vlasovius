@@ -27,7 +27,17 @@ namespace vlasovius
 
 namespace integrators
 {
-	template<typename function>
+
+	template<typename function_1d_xv>
+	arma::vec rho_1d(const function_1d_xv& f, const arma::mat& x,
+			double vmax = 10.0, double eps = 1e-5, size_t threads = 1 );
+
+
+	template<typename function_1d_xv>
+	arma::vec gauss_konrod_1d(const function_1d_xv& f, const arma::mat& x,
+			double a = -10.0, double b = 10.0, double eps = 1e-5, size_t threads = 1 );
+
+	template<typename function_1d>
 	arma::vec gauss_konrod_1d(const function& f, double a,
 			double b, double eps = 1e-5);
 
