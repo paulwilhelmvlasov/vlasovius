@@ -19,7 +19,7 @@
 
 
 template<typename function_1d_xv>
-	arma::vec vlasovius::integrators::rho_1d(const function_1d_xv& f, const arma::mat& x,
+	arma::vec vlasovius::integrators::num_rho_1d(const function_1d_xv& f, const arma::mat& x,
 			double vmax = 10.0, double eps = 1e-5, size_t threads = 1 )
 {
 	arma::uword N = x.n_rows;

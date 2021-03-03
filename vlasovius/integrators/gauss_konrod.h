@@ -29,7 +29,7 @@ namespace integrators
 {
 
 	template<typename function_1d_xv>
-	arma::vec rho_1d(const function_1d_xv& f, const arma::mat& x,
+	arma::vec num_rho_1d(const function_1d_xv& f, const arma::mat& x,
 			double vmax = 10.0, double eps = 1e-5, size_t threads = 1 );
 
 
