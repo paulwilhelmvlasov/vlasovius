@@ -51,14 +51,14 @@ template<typename function_1d_xv>
 
 	arma::vec f_eval = 0.5 * (b - a) * f(z_eval_konrod);
 
-	arma::mat f_eval_konrod(N, 15);
-	arma::mat f_eval_gauss (N, 7 );
+	arma::mat f_eval_konrod(N, m_konrod);
+	arma::mat f_eval_gauss (N, m_gauss );
 
 	#pragma omp parallel for num_threads(threads)
 	for(arma::uword i = 0; i < N; i++)
 	{
 		f_eval_konrod.row(i) = f_eval.subvec(i * m_konrod, (i + 1) * m_konrod - 1).t();
-		f_eval_gauss.row(i)  = f_eval.subvec(i * m_konrod, (i + 1) * m_gauss - 1 ).t();
+		f_eval_gauss.row(i)  = f_eval.subvec(i * m_konrod, i * m_konrod + m_gauss - 1 ).t();
 	}
 
 	arma::vec int_konrod = f_eval_konrod * w_konrod_15;

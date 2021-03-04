@@ -24,6 +24,7 @@
 #include <vlasovius/kernels/wendland.h>
 #include <vlasovius/kernels/rbf_kernel.h>
 #include <vlasovius/kernels/periodised_kernel.h>
+#include <vlasovius/integrators/gauss_konrod.h>
 #include <vlasovius/interpolators/direct_interpolator.h>
 #include <vlasovius/interpolators/pou_interpolator.h>
 #include <vlasovius/misc/periodic_poisson_1d.h>
@@ -231,7 +232,7 @@ int main()
 	}
 
 	// Initialise xv.
-	size_t Nx = 20, Nv = 200;
+	size_t Nx = 20, Nv = 80;
 	xv.set_size( Nx*Nv,2 );
 	f.resize( Nx*Nv );
 	for ( size_t i = 0; i < Nx; ++i )
@@ -266,8 +267,11 @@ int main()
 
 			std::cout << "Interpolation error: " << norm(f-K(xv_stage,xv_stage)*sfx.coeffs(),"inf") << std::endl;
 
-			arma::vec rho = arma::vec(rho_points.n_rows,arma::fill::ones) -
-					        2 * W.integral() * sigma_v * K.eval_x( rho_points, xv_stage ) * sfx.coeffs();
+			//arma::vec rho = arma::vec(rho_points.n_rows,arma::fill::ones) -
+			//		        2 * W.integral() * sigma_v * K.eval_x( rho_points, xv_stage ) * sfx.coeffs();
+			arma::vec rho = vlasovius::integrators::gauss_konrod_1d(sfx, rho_points,
+					-10.0, 10.0, 1e-6, num_threads);
+
 			poisson.update_rho( rho );
 
 			for ( size_t i = 0; i < xv_stage.n_rows; ++i )
@@ -291,3 +295,5 @@ int main()
 		if ( t + dt > T ) dt = T - t;
 	}
 }
+
+
