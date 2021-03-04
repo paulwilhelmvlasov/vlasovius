@@ -269,8 +269,8 @@ int main()
 
 			//arma::vec rho = arma::vec(rho_points.n_rows,arma::fill::ones) -
 			//		        2 * W.integral() * sigma_v * K.eval_x( rho_points, xv_stage ) * sfx.coeffs();
-			arma::vec rho = vlasovius::integrators::gauss_konrod_1d(sfx, rho_points,
-					-10.0, 10.0, 1e-6, num_threads);
+			arma::vec rho = vlasovius::integrators::num_rho_1d(sfx, rho_points.col(0),
+					10.0, 1e-8, num_threads);
 
 			poisson.update_rho( rho );
 
