@@ -38,7 +38,7 @@ namespace integrators
 			double a = -10.0, double b = 10.0, double eps = 1e-5, size_t threads = 1 );
 
 	template<typename function_1d>
-	arma::vec gauss_konrod_1d(const function& f, double a,
+	double gauss_konrod_1d(const function_1d& f, double a,
 			double b, double eps = 1e-5);
 
 	// Nodes for konrod-15-quadrature. Sorted such that the first

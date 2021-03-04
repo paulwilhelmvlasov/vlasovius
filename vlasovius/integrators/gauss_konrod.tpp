@@ -20,7 +20,7 @@
 
 template<typename function_1d_xv>
 	arma::vec vlasovius::integrators::num_rho_1d(const function_1d_xv& f, const arma::mat& x,
-			double vmax = 10.0, double eps = 1e-5, size_t threads = 1 )
+			double vmax, double eps, size_t threads)
 {
 	arma::uword N = x.n_rows;
 	return arma::vec(N, arma::fill::ones) - gauss_konrod_1d(f, x, -vmax, vmax, eps, threads);
@@ -76,8 +76,8 @@ template<typename function_1d_xv>
 }
 
 template<typename function_1d>
-arma::vec vlasovius::integrators::gauss_konrod_1d
-(const function_1d& f, double a, double b, double eps = 1e-5)
+double vlasovius::integrators::gauss_konrod_1d
+(const function_1d& f, double a, double b, double eps)
 {
 	// Note: f:[a,b] -> \R
 
