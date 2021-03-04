@@ -105,6 +105,6 @@ double vlasovius::integrators::gauss_konrod_1d
 	}else
 	{
 		double center = a + 0.5 *  (b - a);
-		return gauss_konrod_1d(f, a, center, 0.5 * eps) + gauss_konrod_1d(f. center, b, 0.5 * eps);
+		return gauss_konrod_1d(f, a, center, 0.5 * eps) + gauss_konrod_1d(f, center, b, 0.5 * eps);
 	}
 }

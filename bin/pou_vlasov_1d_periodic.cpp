@@ -20,8 +20,22 @@
 #include <vlasovius/integrators/gauss_konrod.h>
 #include <vlasovius/interpolators/pou_interpolator.h>
 
+arma::vec test_fct(const arma::vec& x)
+{
+	arma::uword N = x.n_rows;
+	arma::vec r(N);
+	for(arma::uword i = 0; i < N; i++)
+	{
+		r(i) = std::sin(x(i));
+	}
+
+	return r;
+}
 
 int main()
 {
+	double result = vlasovius::integrators::gauss_konrod_1d(test_fct, 0, 3.14, 1e-6);
+	std::cout << result << std::endl;
+
 	return 0;
 }
