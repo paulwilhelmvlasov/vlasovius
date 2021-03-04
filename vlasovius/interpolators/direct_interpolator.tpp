@@ -32,14 +32,14 @@ K { p_K }, X { std::move(p_X) }, coeff { std::move(b) }
 {
 	if ( X.empty() )
 	{
-		throw std::runtime_error { "vlasovius::direct_interpolator::direct_interpolator(): "
-				                   "No interpolation-points passed." };
+		throw std::logic_error { "vlasovius::direct_interpolator::direct_interpolator(): "
+				                 "No interpolation-points passed." };
 	}
 
 	if ( X.n_rows != coeff.size() )
 	{
-		throw std::runtime_error { "vlasovius::direct_interpolator::direct_interpolator(): "
-			                       "Number of points does not match value data vector length." };
+		throw std::logic_error { "vlasovius::direct_interpolator::direct_interpolator(): "
+			                     "Number of points does not match value data vector length." };
 	}
 
 	const size_t n = X.n_rows, dim = X.n_cols, ldX  = n;
@@ -119,7 +119,6 @@ K { p_K }, X { std::move(p_X) }, coeff { std::move(b) }
 	lapack_int info = LAPACKE_dpftrf( LAPACK_COL_MAJOR, 'N', 'L', n, AR.memptr() );
 	if ( info )
 	{
-		std::cout << "LAPACK packed info: " << info << ", n = " << n << std::endl;
 		throw std::runtime_error { "vlasovius::direct_interpolator::direct_interpolator(): "
 		                           "Error while computing Cholesky factorisation of Vandermonde matrix." };
 	}
@@ -137,20 +136,20 @@ arma::vec direct_interpolator<kernel>::operator()( const arma::mat &Y, size_t th
 {
 	if ( Y.empty() )
 	{
-		throw std::runtime_error { "vlasovius::direct_interpolator::operator(): "
-				                   "No evaluation points passed." };
+		throw std::logic_error { "vlasovius::direct_interpolator::operator(): "
+				                 "No evaluation points passed." };
 	}
 
 	if ( X.n_cols != Y.n_cols )
 	{
-		throw std::runtime_error { "vlasovius::direct_interpolator::operator(): "
-		                           "Evaluation and Interpolation points have differing dimensions." };
+		throw std::logic_error { "vlasovius::direct_interpolator::operator(): "
+		                         "Evaluation and Interpolation points have differing dimensions." };
 	}
 
 	size_t dim = X.n_cols, n = Y.n_rows, m = X.n_rows;
 	arma::vec result( Y.n_rows, arma::fill::zeros );
 
-	if ( threads > 1)
+	if ( threads > 1 )
 	{
 		#pragma omp parallel num_threads(threads)
 		{

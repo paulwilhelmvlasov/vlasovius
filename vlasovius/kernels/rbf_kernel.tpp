@@ -54,17 +54,17 @@ void rbf_kernel<rbf_function>::eval( size_t dim, size_t n, size_t m,
 	{
 		#pragma omp parallel for num_threads(threads)
 		for ( size_t j = 0; j < m; ++j )
-			eval_column( dim, n, m, j, K, ldK, X, ldX, Y, ldY );
+			eval_column( dim, n, j, K, ldK, X, ldX, Y, ldY );
 	}
 	else
 	{
 		for ( size_t j = 0; j < m; ++j )
-			eval_column( dim, n, m, j, K, ldK, X, ldX, Y, ldY );
+			eval_column( dim, n, j, K, ldK, X, ldX, Y, ldY );
 	}
 }
 
 template <typename rbf_function>
-void rbf_kernel<rbf_function>::eval_column( size_t dim, size_t n, size_t m, size_t j,
+void rbf_kernel<rbf_function>::eval_column( size_t dim, size_t n, size_t j,
 		                                    double *__restrict__ K, size_t ldK,
 		                                    const double        *X, size_t ldX,
 									        const double        *Y, size_t ldY ) const

@@ -16,33 +16,34 @@
  * You should have received a copy of the GNU General Public License along with
  * vlasovius; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
-#ifndef VLASOVIUS_INTERPOLATORS_POU_INTERPOLATOR_H
-#define VLASOVIUS_INTERPOLATORS_POU_INTERPOLATOR_H
-
+#ifndef VLASOVIUS_GEOMETRY_KD_TREE_H
+#define VLASOVIUS_GEOMETRY_KD_TREE_H
 
 #include <armadillo>
-#include <vlasovius/interpolators/direct_interpolator.h>
 
 namespace vlasovius
 {
 
-namespace interpolators
+namespace geometry
 {
 
-template <typename kernel>
-class pou_interpolator
+class kd_tree
 {
 public:
-	pou_interpolator( const arma::mat &X, const arma::mat &f, size_t min_per_box = 200 );
+	kd_tree( const arma::mat &p_X );
+
+	arma::mat  point_query( const arma::rowvec &q ) const;
+	arma::uvec index_query( const arma::rowvec &q ) const;
+
+	arma::mat  covering_boxes( size_t min_per_box ) const;
 
 private:
-	arma::mat cover;
-	std::vector< direct_interpolator<kernel> > local_interpolants;
+	arma::mat  X;
+	arma::uvec idx;
 };
 
 }
 
 }
 
-#include <vlasovius/interpolators/pou_interpolator.tpp>
 #endif

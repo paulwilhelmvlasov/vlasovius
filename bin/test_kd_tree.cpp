@@ -19,29 +19,71 @@
 
 #include <iostream>
 
-#include <vlasovius/trees/kd_tree.h>
+#include <vlasovius/geometry/kd_tree.h>
+#include <vlasovius/geometry/bounding_box.h>
 #include <vlasovius/misc/stopwatch.h>
 
 int main()
 {
-	size_t N = 1e6;
+	size_t N = 1e6; size_t min_per_box = 400;
 	arma::mat points(N, 2, arma::fill::randu);
-	arma::vec rhs(N, arma::fill::randu);
-	/*
-	points = {
-	{0.2, 1}, {0.4, 0.6}, {0.3, 0.4}, {0.6, 0.7}, {0.8, 0.3}
-	};
-
-	std::cout << points << std::endl;
-	 */
 
 	vlasovius::misc::stopwatch watch;
-	vlasovius::trees::kd_tree baum(points, rhs, 500, 1000);
-	double zeit = watch.elapsed();
+	vlasovius::geometry::kd_tree baum(points);
+	double zeit { watch.elapsed() };
 	std::cout << "Speedy speed: " << zeit << std::endl;
-	std::cout << "Number nodes: " << baum.get_number_nodes() << std::endl;
-	std::cout << "Number leafs: " << baum.getNumberLeafs() << std::endl;
 
+	watch.reset();
+	arma::mat cover = baum.covering_boxes(min_per_box);
+	zeit = watch.elapsed();
+	std::cout << "Time for computing covering: " << zeit << std::endl;
+	std::cout << "Size of covering: " << cover.n_rows << std::endl;
+
+	double max_zeit = 0, total_zeit = 0;
+	for ( size_t i = 0; i < cover.n_rows; ++i )
+	{
+		arma::rowvec box = cover.row(i);
+		watch.reset();
+		arma::uvec idx = baum.index_query( box );
+		zeit = watch.elapsed();
+		max_zeit = std::max(zeit,max_zeit);
+		total_zeit += zeit;
+
+		if ( idx.size() < min_per_box && ! (N > min_per_box) )
+		{
+			std::cout << "Error! Number of results in box is smaller than min_per_box!";
+			return -2;
+		}
+		std::vector<arma::uword> myidx;
+		for ( size_t j = 0; j < N; ++j )
+		{
+			arma::rowvec p = points.row(j);
+			if ( vlasovius::geometry::bounding_box::contains_point(box,p) )
+			{
+				myidx.push_back(j);
+			}
+		}
+
+		if ( myidx.size() != idx.size() )
+		{
+			std::cout << "Error! Results of kd_tree and exhaustive search differ.";
+			return -1;
+		}
+
+		std::sort( myidx.begin(), myidx.end() );
+		std::sort(   idx.begin(),   idx.end() );
+
+		for ( size_t j = 0; j < myidx.size(); ++j )
+		{
+			if ( idx[j] != myidx[j] )
+			{
+				std::cout << "Error! Results of kd_tree and exhaustive search differ.";
+				return -1;
+			}
+		}
+	}
+	std::cout << "Maximum query time: " << max_zeit << std::endl;
+	std::cout << "Average query time: " << total_zeit/cover.n_rows << std::endl;
 	return 0;
 }
 

@@ -91,38 +91,21 @@ arma::vec wendland<dim,k,simd_t>::operator()( arma::vec rvec ) const
 template <size_t dim, size_t k, typename simd_t>
 void wendland<dim,k,simd_t>::eval( double *__restrict__ result, size_t n ) const noexcept
 {
-	constexpr size_t N { (dim/2) + 3*k + 2 };
-
-	if constexpr ( simd_t::size() == 1 )
+	size_t i { 0 };
+	if constexpr ( simd_t::size() > 1 )
 	{
-		for ( size_t i = 0; i < n; ++i )
-			result[i] = (*this)(result[i]);
-		return;
-	}
-	else
-	{
-		size_t i { 0 };
+		simd_t r;
 		for ( ; i + simd_t::size() < n; i += simd_t::size() )
 		{
-			simd_t r { result + i };
-
-			r = abs(r);
-			simd_t fhalf  { r+r-1.0 }, f { fhalf + fhalf };
-			simd_t z_prev { cc[0] },   z { fmadd(f,cc[0],cc[1]) };
-			for ( size_t i = 2; i < N-1; ++i )
-			{
-				simd_t tmp = fmadd(f,z,cc[i])-z_prev;
-				z_prev = z;
-				z      = tmp;
-			}
-			z = (fmadd(fhalf,z,cc[N-1]) - z_prev) & less_than( r, 1.0 );
-			z.store( result + i );
+			r.load( result + i );
+			r = (*this)(r);
+			r.store( result + i );
 		}
-
-		// Compute the remaining entries in scalar mode.
-		for ( ; i < n; ++i )
-			result[i] = (*this)( result[i] );
 	}
+
+	// Compute the remaining entries in scalar mode.
+	for ( ; i < n; ++i )
+		result[i] = (*this)( result[i] );
 }
 
 /*!

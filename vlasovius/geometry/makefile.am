@@ -1,0 +1,4 @@
+noinst_LTLIBRARIES = libgeometry.la
+
+libgeometry_la_SOURCES = kd_tree.cpp bounding_box.cpp
+libgeometry_la_LIBADD  =
