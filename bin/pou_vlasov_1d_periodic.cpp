@@ -248,6 +248,16 @@ int main()
 		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1 + alpha*std::cos(K*x) ) * std::exp( -v*v/2 );
 	}
 
+	arma::mat plotX( 101*101, 2 );
+	arma::vec plotf( 101*101 );
+	for ( size_t i = 0; i <= 100; ++i )
+		for ( size_t j = 0; j <= 100; ++j )
+		{
+			plotX(j + 101*i,0) = L * i/100.;
+			plotX(j + 101*i,1) = 20.0 * j/100. - 10.0;
+			plotf(j + 101*i) = 0;
+		}
+
 	double t = 0, T = 100, dt = 1./4.;
 	std::ofstream str("E.txt");
 	while ( t < T )
@@ -277,6 +287,18 @@ int main()
 			{
 				str << t << " " << norm(k_xv[stage].col(1),"inf")  << std::endl;
 				std::cout << "Max-norm of E: " << norm(k_xv[stage].col(1),"inf") << "." << std::endl;
+
+				plotf = sfx(plotX);
+				std::ofstream str( "f_" + std::to_string(t) + "s.txt" );
+				for ( size_t i = 0; i <= 100; ++i )
+				{
+					for ( size_t j = 0; j <= 100; ++j )
+					{
+						str << plotX(j + 101*i,0) << " " << plotX(j + 101*i,1)
+								<< " " << plotf(j+101*i) << std::endl;
+					}
+					str << "\n";
+				}
 			}
  		}
 
