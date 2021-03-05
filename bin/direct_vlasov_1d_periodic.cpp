@@ -248,7 +248,7 @@ int main()
 		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1 + alpha*std::cos(K*x) ) * std::exp( -v*v/2 );
 	}
 
-	double t = 0, T = 100, dt = 1./8.;
+	double t = 0, T = 100, dt = 1./1.;
 	std::ofstream str("E.txt");
 	while ( t < T )
 	{
@@ -267,10 +267,10 @@ int main()
 
 			std::cout << "Interpolation error: " << norm(f-K(xv_stage,xv_stage)*sfx.coeffs(),"inf") << std::endl;
 
-			//arma::vec rho = arma::vec(rho_points.n_rows,arma::fill::ones) -
-			//		        2 * W.integral() * sigma_v * K.eval_x( rho_points, xv_stage ) * sfx.coeffs();
-			arma::vec rho = vlasovius::integrators::num_rho_1d(sfx, rho_points.col(0),
-					10.0, 1e-8, num_threads);
+			arma::vec rho = arma::vec(rho_points.n_rows,arma::fill::ones) -
+					        2 * W.integral() * sigma_v * K.eval_x( rho_points, xv_stage ) * sfx.coeffs();
+			//arma::vec rho = vlasovius::integrators::num_rho_1d(sfx, rho_points.col(0),
+			//		10.0, 1e-16, num_threads);
 
 			poisson.update_rho( rho );
 
