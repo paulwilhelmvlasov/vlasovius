@@ -6,6 +6,7 @@
 *.lo
 *.log
 *.exe
+*.txt
 doc/*
 aclocal.m4
 config.guess
