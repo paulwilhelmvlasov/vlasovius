@@ -33,10 +33,15 @@ template <typename kernel>
 class pou_interpolator
 {
 public:
-	pou_interpolator( const arma::mat &X, const arma::mat &f, size_t min_per_box = 200 );
+	pou_interpolator( kernel K, const arma::mat &X, const arma::mat &f,
+			          arma::rowvec bounding_box, double enlarge,
+					  size_t min_per_box = 200, double tikhonov_mu = 0 );
+
+	arma::mat operator()( const arma::mat &Y ) const;
 
 private:
 	arma::mat cover;
+	size_t nrhs;
 	std::vector< direct_interpolator<kernel> > local_interpolants;
 };
 

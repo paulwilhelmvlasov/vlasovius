@@ -32,16 +32,23 @@ template <typename kernel>
 class direct_interpolator
 {
 public:
-	direct_interpolator( kernel K, arma::mat X, arma::vec b,
+	direct_interpolator() = default;
+	direct_interpolator( const direct_interpolator&  )  = default;
+	direct_interpolator(       direct_interpolator&&  ) = default;
+
+	direct_interpolator& operator=( const direct_interpolator&  ) = default;
+	direct_interpolator& operator=(       direct_interpolator&& ) = default;
+
+	direct_interpolator( kernel K, arma::mat X, arma::mat b,
 			             double tikhonov_mu = 0, size_t threads = 1 );
 
-	arma::vec operator()( const arma::mat &Y, size_t threads = 1 ) const;
-	arma::vec coeffs() const { return coeff; }
+	arma::mat operator()( const arma::mat &Y, size_t threads = 1 ) const;
+	arma::mat coeffs() const { return coeff; }
 
 private:
 	kernel    K;
 	arma::mat X;
-	arma::vec coeff;
+	arma::mat coeff;
 };
 
 }
@@ -50,3 +57,4 @@ private:
 
 #include <vlasovius/interpolators/direct_interpolator.tpp>
 #endif
+

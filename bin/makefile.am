@@ -1,4 +1,4 @@
-noinst_PROGRAMS = test_wendland test_direct_interpolator test_kd_tree direct_vlasov_1d_periodic 
+noinst_PROGRAMS = test_wendland test_direct_interpolator test_kd_tree test_pou_interpolator direct_vlasov_1d_periodic 
 
 test_wendland_SOURCES = test_wendland.cpp
 test_wendland_LDADD = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp
@@ -9,8 +9,8 @@ test_direct_interpolator_LDADD = $(top_builddir)/vlasovius/libvlasovius.la $(BLA
 test_kd_tree_SOURCES = test_kd_tree.cpp
 test_kd_tree_LDADD = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS)
 
-#test_pou_interpolator_SOURCES = test_pou_interpolator.cpp
-#test_pou_interpolator_LDADD = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp
+test_pou_interpolator_SOURCES = test_pou_interpolator.cpp
+test_pou_interpolator_LDADD = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp
 
 direct_vlasov_1d_periodic_SOURCES = direct_vlasov_1d_periodic.cpp
 direct_vlasov_1d_periodic_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp

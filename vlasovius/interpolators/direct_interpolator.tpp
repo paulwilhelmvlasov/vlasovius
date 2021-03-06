@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License along with
  * vlasovius; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
-
+#include <vlasovius/interpolators/direct_interpolator.h>
 #include <lapacke.h>
 
 namespace vlasovius
@@ -27,7 +27,7 @@ namespace interpolators
 
 template <typename kernel>
 direct_interpolator<kernel>::direct_interpolator
-( kernel p_K, arma::mat p_X, arma::vec b, double tikhonov_mu, size_t threads ):
+( kernel p_K, arma::mat p_X, arma::mat b, double tikhonov_mu, size_t threads ):
 K { p_K }, X { std::move(p_X) }, coeff { std::move(b) }
 {
 	if ( X.empty() )
@@ -43,8 +43,8 @@ K { p_K }, X { std::move(p_X) }, coeff { std::move(b) }
 	}
 
 	const size_t n = X.n_rows, dim = X.n_cols, ldX  = n;
-	const size_t ar_rows = (n & 1) ?  (n      ) : (n+1);
-	const size_t ar_cols = (n & 1) ?  (n/2 + 1) : (n/2);
+	const size_t ar_rows = (n & 1) ? (n      ) : (n+1);
+	const size_t ar_cols = (n & 1) ? (n/2 + 1) : (n/2);
 
 	// AR is stored in Rectangular Full Packed Format (RFPF)
 	// See reference [gstv2010]
@@ -123,7 +123,7 @@ K { p_K }, X { std::move(p_X) }, coeff { std::move(b) }
 		                           "Error while computing Cholesky factorisation of Vandermonde matrix." };
 	}
 
-	info = LAPACKE_dpftrs( LAPACK_COL_MAJOR, 'N', 'L', n, 1, AR.memptr(), coeff.memptr(), n );
+	info = LAPACKE_dpftrs( LAPACK_COL_MAJOR, 'N', 'L', n, coeff.n_cols, AR.memptr(), coeff.memptr(), n );
 	if ( info )
 	{
 		throw std::runtime_error { "vlasovius::direct_interpolator::direct_interpolator(): "
@@ -132,7 +132,7 @@ K { p_K }, X { std::move(p_X) }, coeff { std::move(b) }
 }
 
 template <typename kernel>
-arma::vec direct_interpolator<kernel>::operator()( const arma::mat &Y, size_t threads ) const
+arma::mat direct_interpolator<kernel>::operator()( const arma::mat &Y, size_t threads ) const
 {
 	if ( Y.empty() )
 	{
@@ -147,32 +147,29 @@ arma::vec direct_interpolator<kernel>::operator()( const arma::mat &Y, size_t th
 	}
 
 	size_t dim = X.n_cols, n = Y.n_rows, m = X.n_rows;
-	arma::vec result( Y.n_rows, arma::fill::zeros );
+	arma::mat result( Y.n_rows, coeff.n_cols, arma::fill::zeros );
 
 	if ( threads > 1 )
 	{
 		#pragma omp parallel num_threads(threads)
 		{
-			arma::vec tmp( Y.n_rows ), thread_sum( Y.n_rows, arma::fill::zeros );
+			arma::rowvec tmp( X.n_rows );
 
 			#pragma omp for
-			for ( size_t i = 0; i < X.n_rows; ++i )
+			for ( size_t i = 0; i < Y.n_rows; ++i )
 			{
-				K.eval( dim, n, 1, tmp.memptr(), n, Y.memptr(), n, &X(i,0), m );
-				thread_sum += tmp*coeff(i);
+				K.eval( dim, m, 1, tmp.memptr(), m, &X(0,0), m, &Y(i,0), n );
+				result.row(i) += tmp*coeff;
 			}
-
-			#pragma omp critical
-			result += thread_sum;
 		}
 	}
 	else
 	{
-		arma::vec tmp( Y.n_rows );
-		for ( size_t i = 0; i < X.n_rows; ++i )
+		arma::rowvec tmp( X.n_rows );
+		for ( size_t i = 0; i < Y.n_rows; ++i )
 		{
-			K.eval( dim, n, 1, tmp.memptr(), n, Y.memptr(), n, &X(i,0), m );
-			result += tmp*coeff(i);
+			K.eval( dim, m, 1, tmp.memptr(), m, &X(0,0), m, &Y(i,0), n );
+			result.row(i) += tmp*coeff;
 		}
 	}
 	return result;

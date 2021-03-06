@@ -34,6 +34,11 @@ class rbf_kernel
 public:
 	rbf_kernel( rbf_function p_F = rbf_function {}, double sigma = 1 );
 
+	rbf_kernel( const rbf_kernel&  ) = default;
+	rbf_kernel(       rbf_kernel&& ) = default;
+	rbf_kernel& operator=( const rbf_kernel&  ) = default;
+	rbf_kernel& operator=(       rbf_kernel&& ) = default;
+
 	arma::mat operator()( const arma::mat &X, const arma::mat &Y ) const;
 
 
