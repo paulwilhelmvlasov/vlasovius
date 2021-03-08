@@ -34,6 +34,11 @@ class rbf_kernel
 public:
 	rbf_kernel( rbf_function p_F = rbf_function {}, double sigma = 1 );
 
+	rbf_kernel( const rbf_kernel&  ) = default;
+	rbf_kernel(       rbf_kernel&& ) = default;
+	rbf_kernel& operator=( const rbf_kernel&  ) = default;
+	rbf_kernel& operator=(       rbf_kernel&& ) = default;
+
 	arma::mat operator()( const arma::mat &X, const arma::mat &Y ) const;
 
 
@@ -45,7 +50,7 @@ public:
 
 private:
 
-	void eval_column( size_t dim, size_t n, size_t m, size_t j,
+	void eval_column( size_t dim, size_t n, size_t j,
 			          double *__restrict__ K, size_t ldK,
 	                  const double        *X, size_t ldX,
 	                  const double        *Y, size_t ldY ) const;

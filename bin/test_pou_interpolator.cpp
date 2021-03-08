@@ -196,14 +196,9 @@ void xv_kernel<k1,k2>::eval( size_t /* dim */, size_t n, size_t m,
 int main()
 {
 	constexpr size_t dim { 2 }, k { 4 };
-	constexpr size_t Nx { 100 };
-	constexpr size_t Nv { 100 };
-	constexpr size_t eval_Nx { 100 };
-	constexpr size_t eval_Nv { 100 };
-	constexpr size_t N { (Nx + 1) * (Nv + 1) };
-	constexpr double tikhonov_mu { 0 };
+	constexpr size_t N { 1'000'000 };
+	constexpr double tikhonov_mu { 1e-12 };
 	constexpr size_t min_per_box = 100;
-	constexpr size_t max_per_box = 200;
 	constexpr double enlarge = 1.5;
 	constexpr double twopi { 2*3.1415926535 };
 
@@ -211,7 +206,6 @@ int main()
 
 	std::cout << "N = " << N << std::endl;
 	std::cout << "min per Box = " << min_per_box << std::endl;
-	std::cout << "max per Box = " << max_per_box << std::endl;
 
 	constexpr size_t order = 4;
 
@@ -221,12 +215,6 @@ int main()
 	using interpolator_t = vlasovius::interpolators::pou_interpolator<kernel_t>;
 
 	arma::mat X( N, 2, arma::fill::randu );
-	for ( size_t i = 0; i <= Nx; ++i )
-		for ( size_t j = 0; j <= Nv; ++j )
-		{
-			X(j + (Nx + 1)*i,0) = L * i/double(Nx);
-			X(j + (Nx + 1)*i,1) = 20.0 * j/double(Nv) - 10.0;
-		}
 	X.col(0) = L * X.col(0);
 	X.col(1) = 20.0 * X.col(1) - 10.0;
 	arma::vec f( N );
@@ -238,24 +226,27 @@ int main()
 				* std::exp( - y * y /2 );
 	}
 
+	arma::rowvec bounding_box { 0, 0, 1, 1 };
 	vlasovius::misc::stopwatch clock;
-	//interpolator_t sfx { kernel_t {1.0, 1.0, L}, X, f, tikhonov_mu, min_per_box, max_per_box, enlarge};
-	interpolator_t sfx { kernel_t {{}, 2.0}, X, f, tikhonov_mu, min_per_box, max_per_box, enlarge};
+	kernel_t K { wendland_t {}, 0.5 };
+	interpolator_t sfx { K, X, f, bounding_box, enlarge, min_per_box, tikhonov_mu };
 	double elapsed { clock.elapsed() };
 	std::cout << "Time for computing RBF-Approximation: " << elapsed << ".\n";
-	std::cout << "Maximal interpolation error: " << norm(f-sfx(X),"inf") << ".\n";
+	clock.reset();
+	double error = norm(f-sfx(X),"inf");
+	elapsed = clock.elapsed();
+	std::cout << "Maximal interpolation error: " << error << ".\n";
+	std::cout << "Time for evaluating interpolation error: " << elapsed << ".\n";
 
 
-
-	arma::mat plotX( (eval_Nx + 1)*(eval_Nv + 1), 2 );
-	arma::vec plotf_true((eval_Nx + 1) * (eval_Nv + 1));
-	for ( size_t i = 0; i <= eval_Nx; ++i )
-		for ( size_t j = 0; j <= eval_Nv; ++j )
+	arma::mat plotX( 1001*1001, 2 );
+	arma::vec plotf_true( 1001*1001 );
+	for ( size_t i = 0; i <= 1000; ++i )
+		for ( size_t j = 0; j <= 1000; ++j )
 		{
-			double x = plotX(j + (eval_Nx + 1)*i,0) = L * i/double(eval_Nx);
-			double y = plotX(j + (eval_Nx + 1)*i,1) = 20.0 * j/double(eval_Nv) - 10.0;
-			plotf_true(j + eval_Nx*i) = 0.39894228040143267793994 * ( 1 + 0.01 * std::cos(0.5*x) )
-						* std::exp( - y * y /2 );
+			double x = plotX(j + 1001*i,0) = i/1000.;
+			double y = plotX(j + 1001*i,1) = j/1000.;
+			plotf_true(j + 1001*i) = std::sin(twopi*x)*std::sin(twopi*y);
 		}
 
 	clock.reset();
@@ -265,15 +256,14 @@ int main()
 	std::cout << "Maximum encountered error at plotting points: " << norm(plotf-plotf_true,"inf") << ".\n";
 
 	std::ofstream str( "test_pou_interpolator.txt" );
-	for ( size_t i = 0; i <= eval_Nx; ++i )
+	for ( size_t i = 0; i <= 1000; ++i )
 	{
-		for ( size_t j = 0; j <= eval_Nv; ++j )
+		for ( size_t j = 0; j <= 1000; ++j )
 		{
-			double x = plotX(j + (eval_Nx + 1) * i, 0);
-			double y = plotX(j + (eval_Nx + 1) * i, 1);
-			double value  = plotf(j + (eval_Nx + 1) * i);
-					//- plotf_true(j + (eval_Nx + 1) * i);
-			str << x << " " << y << " " << value << std::endl;
+			double x = plotX(j + 1001*i,0);
+			double y = plotX(j + 1001*i,1);
+			double err  = plotf(j+1001*i)-plotf_true(j+1001*i);
+			str << x << " " << y << " " << err << std::endl;
 		}
 		str << "\n";
 	}

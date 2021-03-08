@@ -7,7 +7,7 @@ test_direct_interpolator_SOURCES = test_direct_interpolator.cpp
 test_direct_interpolator_LDADD = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp
 
 test_kd_tree_SOURCES = test_kd_tree.cpp
-test_kd_tree_LDADD = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp
+test_kd_tree_LDADD = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS)
 
 test_pou_interpolator_SOURCES = test_pou_interpolator.cpp
 test_pou_interpolator_LDADD = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp

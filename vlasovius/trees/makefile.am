@@ -1,4 +1,0 @@
-noinst_LTLIBRARIES = libtrees.la
-
-libtrees_la_SOURCES = kd_tree.cpp
-libtrees_la_LIBADD  =

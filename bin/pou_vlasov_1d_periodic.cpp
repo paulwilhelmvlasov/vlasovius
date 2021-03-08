@@ -202,11 +202,19 @@ int main()
 	using wendland_t = vlasovius::kernels::wendland<1,4>;
 	wendland_t W;
 
+	constexpr size_t dim { 2 }, k { 4 };
+	constexpr size_t N { 1'000'000 };
+	constexpr double tikhonov_mu { 1e-12 };
+	constexpr size_t min_per_box = 100;
+	constexpr double enlarge = 1.5;
+	arma::rowvec bounding_box { 0, 0, 1, 1 };
+
+
 	double L = 4*3.14159265358979323846, sigma_x  = 3.0, sigma_v = 3.0;
 	kernel_t K( sigma_x, sigma_v, L );
 	size_t Nx = 20, Nv = 80;
 
-
+/*
 	size_t num_threads = omp_get_max_threads();
 
 	// Runge--Kutta Butcher tableau.
@@ -273,7 +281,7 @@ int main()
 			k_xv[ stage ].resize( xv.n_rows, xv.n_cols );
 			k_xv[ stage ].col(0) = xv_stage.col(1);
 
-			interpolator_t sfx( K, xv_stage, f, 1e-9, 150, 300, 1.5);
+			interpolator_t sfx { K, xv_stage, f, bounding_box, enlarge, min_per_box, tikhonov_mu };
 
 			arma::vec rho = vlasovius::integrators::num_rho_1d(sfx, rho_points.col(0),
 					10.0, 1e-16, num_threads);
@@ -312,6 +320,7 @@ int main()
 
 		if ( t + dt > T ) dt = T - t;
 	}
+	*/
 }
 
 

@@ -1,6 +1,6 @@
-SUBDIRS = kernels trees
+SUBDIRS = kernels geometry
 
 noinst_LTLIBRARIES = libvlasovius.la
 
 libvlasovius_la_SOURCES = 
-libvlasovius_la_LIBADD  = kernels/libkernels.la trees/libtrees.la
+libvlasovius_la_LIBADD  = kernels/libkernels.la geometry/libgeometry.la

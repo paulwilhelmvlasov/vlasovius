@@ -26,7 +26,7 @@ AC_CONFIG_HEADERS([vlasovius/config.h])
 AC_CONFIG_FILES([Makefile
                  vlasovius/makefile
                  vlasovius/kernels/makefile
-		 vlasovius/trees/makefile
+                 vlasovius/geometry/makefile
                  bin/makefile])
 
 LT_INIT

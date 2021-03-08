@@ -16,236 +16,111 @@
  * You should have received a copy of the GNU General Public License along with
  * vlasovius; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
+#include <vlasovius/interpolators/pou_interpolator.h>
+
+#include <vlasovius/geometry/kd_tree.h>
+#include <vlasovius/geometry/bounding_box.h>
 
 
-template <size_t k>
-vlasovius::interpolators::pou_inducing_kernel<k>::pou_inducing_kernel( const arma::rowvec& sigma )
+#include <vlasovius/kernels/wendland.h>
+
+namespace vlasovius
 {
-	size_t d = sigma.n_cols;
-	dim_kernels.reserve(d);
 
-	for(size_t i = 0; i < d; i++)
-	{
-		dim_kernels.push_back(wendland{rbf_wendland {}, sigma(i) });
-	}
-}
-
-template <size_t k>
-arma::mat vlasovius::interpolators::pou_inducing_kernel<k>::operator()( const arma::mat &xv1, const arma::mat &xv2 ) const
+namespace interpolators
 {
-	arma::mat m = dim_kernels[0]( xv1.col(0), xv2.col(0) ) %
-		       dim_kernels[1]( xv1.col(1), xv2.col(1) );
 
-	for(size_t i = 2; i < dim_kernels.size(); i++)
+template <typename kernel>
+pou_interpolator<kernel>::pou_interpolator( kernel K, const arma::mat &X, const arma::mat &f,
+		                                    arma::rowvec bounding_box, double enlarge,
+											size_t min_per_box, double tikhonov_mu ):
+nrhs { f.n_cols }
+{
+	using ::vlasovius::geometry::bounding_box::intersection;
+	size_t dim { X.n_cols };
+	geometry::kd_tree tree(X);
+	cover = tree.covering_boxes(min_per_box);
+
+	local_interpolants.resize(cover.n_rows);
+
+	size_t count { 0 };
+	#pragma omp parallel for reduction(+:count)
+	for ( size_t i = 0; i < cover.n_rows; ++i )
 	{
-		m = m % dim_kernels[i]( xv1.col(i), xv2.col(i) );
-	}
+		arma::rowvec bounds = intersection( bounding_box, cover.row(i) );
+		for ( size_t d = 0; d < dim; ++d )
+		{
+			double l = (bounds(d+dim) - bounds(d))*enlarge/2;
+			double c = bounds(d) + (bounds(d+dim)-bounds(d))/2;
+			bounds(d    ) = c - l;
+			bounds(d+dim) = c + l;
+		}
+		cover.row(i) = bounds;
 
-	return m;
+		arma::uvec idx = tree.index_query(bounds);
+		local_interpolants[i] = direct_interpolator<kernel>( K, X.rows(idx), f.rows(idx), tikhonov_mu );
+		count += idx.size();
+	}
+	std::cout << "Number of particles per box: " << double(count) / double(cover.n_rows) << ".\n";
 }
 
 template <typename kernel>
-vlasovius::interpolators::pou_interpolator<kernel>::pou_interpolator( kernel K, arma::mat X,
-		arma::vec b, double tikhonov_mu, size_t min_per_box, size_t max_per_box,
-		double enlargement_factor)
-: K(K), tree(vlasovius::trees::kd_tree(X, b, min_per_box, max_per_box))
+arma::mat pou_interpolator<kernel>::operator()( const arma::mat &Y ) const
 {
-	if(enlargement_factor < 1.0) {
-		throw std::runtime_error("Enlargement factor must be greater or equal 1.");
-	}
+	static vlasovius::kernels::wendland<2,4> W;
 
-	sub_sfx.reserve(tree.getNumberLeafs());
-	weight_fcts.reserve(tree.getNumberLeafs());
+	size_t dim { Y.n_cols };
+	vlasovius::geometry::kd_tree tree { Y };
 
-	construct_sub_sfx(X, b, enlargement_factor, tikhonov_mu);
-}
-
-template <typename kernel>
-void vlasovius::interpolators::pou_interpolator<kernel>::construct_sub_sfx(arma::mat X,
-		arma::vec b, double enlargement_factor, double tikhonov_mu)
-{
-	vlasovius::misc::stopwatch clock;
-	// Get the leaf-indices:
-	// (Note that usually there are approximately twice as many nodes as leafs
-	// so just running through all nodes and checking on leaf-status might have
-	// the optimal run-time.)
-	size_t n_leafs = tree.getNumberLeafs();
-
-	indices_leafs = tree.get_indices_leafs();
-
-	// Get the point-sets for each sub-sfx and compute the bounding-box. Note that
-	// I have to enlarge the boxes of each leaf such that they slightly overlap.
-	// To compute the enlarged boxes, use the tree-structure.
-	std::vector<std::deque<arma::uword>> indices_points(n_leafs);
-	sub_domains = std::vector<vlasovius::trees::bounding_box>(n_leafs);
-
-	//#pragma omp parallel for
-	for(size_t i = 0; i < n_leafs; i++)
+	arma::mat result   ( Y.n_rows, nrhs, arma::fill::zeros );
+	arma::vec weightsum( Y.n_rows,       arma::fill::zeros );
+	#pragma omp parallel
 	{
-		size_t index_node = indices_leafs[i];
-		vlasovius::trees::node leaf_nd = tree.getNode(index_node);
+		arma::mat my_result   ( Y.n_rows, nrhs, arma::fill::zeros );
+		arma::vec my_weightsum( Y.n_rows,       arma::fill::zeros );
+		arma::rowvec inv_sigma(dim), centre(dim);
 
-		//Init local point deque:
-		indices_points[i] = std::deque<arma::uword>(leaf_nd.indexLastElem - leaf_nd.indexFirstElem);
-
-		// Fill index-list with current inhabitants:
-		size_t counter = 0;
-		for(arma::uword j = leaf_nd.indexFirstElem; j < leaf_nd.indexLastElem; j++)
+		#pragma omp for schedule(dynamic)
+		for ( size_t i = 0; i < cover.n_rows; ++i )
 		{
-			indices_points[i][counter] = j;
-			counter++;
-		}
+			arma::rowvec box    = cover.row(i);
+			arma::uvec   idx    = tree.index_query( box );
+			if ( idx.size() == 0 )
+				continue;
 
-		// Compute new bounding-box:
-		sub_domains[i] = leaf_nd.box;
-		sub_domains[i].sidelength *= enlargement_factor;
-		// Find now all points intersecting the new bounding-box:
-		// Therefore first find the parent-node which completely contains the sub-domain
-		// and check child-points on intersection.
-		int index_curr_parent = leaf_nd.parent;
+			arma::mat values = local_interpolants[i]( Y.rows(idx) );
 
-		// While root (== 0) is not reached and the sub-domain is not a subset of the current
-		// bounding box trace the tree to the top.
-		while(!subset(sub_domains[i], tree.getNode(index_curr_parent).box))
-		{
-			if(index_curr_parent > 0){
-				index_curr_parent = tree.getNode(index_curr_parent).parent;
-			}else{
-				index_curr_parent = 0;
-				break;
-			}
-		}
-
-		// Now check the contained points on intersection. Ignore the already known points (i.e.
-		// the ones contained in the original leaf):
-		vlasovius::trees::node parent_nd = tree.getNode(index_curr_parent);
-		for(arma::uword j = parent_nd.indexFirstElem;
-				(j < parent_nd.indexLastElem)
-			&& !(leaf_nd.indexFirstElem <= j && j <= leaf_nd.indexLastElem);
-				j++ )
-		{
-			if(sub_domains[i].contains(X.row(j)))
+			for ( size_t d = 0; d < dim; ++d )
 			{
-				indices_points[i].push_back(j);
+				inv_sigma(d) = 1./((box(d+dim)-box(d))/2);
+				   centre(d) =     (box(d+dim)+box(d))/2;
 			}
+
+			arma::vec weights( idx.size() );
+			for ( size_t j = 0; j < idx.size(); ++j )
+			{
+				weights(j) = W( std::abs(Y(idx(j),0)-centre(0))*inv_sigma(0) );
+				for ( size_t d = 1; d < dim; ++d )
+					weights(j) *= W( std::abs(Y(idx(j),d)-centre(d))*inv_sigma(d) );
+			}
+
+			   my_result.rows(idx) += weights % values;
+			my_weightsum.rows(idx) += weights;
 		}
 
-		// Finally compute the direct_interpolator's:
-		arma::uword N_sub = indices_points[i].size();
-		arma::mat sub_pts(N_sub, X.n_cols);
-		arma::vec sub_rhs(N_sub);
-
-		for(size_t j = 0; j < indices_points[i].size(); j++)
-		{
-			arma::uword curr = indices_points[i][j];
-			sub_pts.row(j) = X.row(curr);
-			sub_rhs(j) = b(curr);
-		}
-
-		direct_interpolator<kernel> sfx (K, sub_pts, sub_rhs, tikhonov_mu );
-		pou_inducing_kernel<4>      w   (sub_domains[i].sidelength);
-
-		// Writing to the shared arrays can only happen one at a time.
 		#pragma omp critical
 		{
-			sub_sfx.push_back( std::move(sfx) );
-			weight_fcts.push_back( std::move(w) );
+			weightsum += my_weightsum;
+			result    += my_result;
 		}
 	}
 
-	// For faster evaluation compute which sub-domains intersect which leafs:
-	domains_intersect_leafs.resize(n_leafs);
+	for ( size_t i = 0; i < result.n_rows; ++i )
+		result.row(i) *= 1./weightsum(i);
 
-	for(size_t i_leaf = 0; i_leaf < n_leafs; i_leaf++)
-	{
-		vlasovius::trees::bounding_box box_leaf = tree.getNode(indices_leafs[i_leaf]).box;
-		for(size_t i_d = 0; i_d < n_leafs; i_d++)
-		{
-			if(vlasovius::trees::intersect(box_leaf, sub_domains[i_d]))
-			{
-				domains_intersect_leafs[i_leaf].push_back(i_d);
-			}
-		}
-	}
-
-	double elapsed { clock.elapsed() };
-	std::cout << "Time for constructing pou after tree is build: " << elapsed << ".\n";
+	return result;
 }
 
-template <typename kernel>
-arma::vec vlasovius::interpolators::pou_interpolator<kernel>::operator()( const arma::mat &Y ) const
-{
-	std::vector<int> w(Y.n_rows);
-	size_t n_submat = indices_leafs.size() + 1;
-	std::vector<size_t> sizes_sub_matrices(n_submat, 0);
-	// Compute in which leaf each evaluation point lies and the needed
-	// sub-matrix size for each leaf:
-	for(size_t i = 0; i < w.size(); i++)
-	{
-		w[i] = tree.whichLeafContains(Y.row(i));
-		if(w[i] < 0){
-			sizes_sub_matrices[n_submat - 1]++;
-			w[i] = n_submat - 1;
-		} else {
-			sizes_sub_matrices[w[i]]++;
-		}
-	}
+}
 
-	// Reserve space for the sub-matrices:
-	std::vector<arma::mat> sub_matrix(n_submat);
-	std::vector<std::vector<arma::uword>> orig_indices(n_submat);
-	for(size_t i = 0; i < n_submat; i++)
-	{
-		sub_matrix[i] = arma::mat(sizes_sub_matrices[i], Y.n_cols);
-		orig_indices[i].resize(sizes_sub_matrices[i]);
-	}
-
-	// Fill sub-matrices and remember the index of the point in
-	// the original matrix to construct the correctly ordered
-	// return vector:
-	std::vector<size_t> curr_row_index(n_submat, 0);
-	for(size_t i = 0; i < Y.n_rows; i++)
-	{
-		size_t index_submat = w[i];
-		arma::uword row_index = curr_row_index[index_submat];
-		sub_matrix[index_submat].row(row_index) = Y.row(i);
-		orig_indices[index_submat][row_index] = i;
-		curr_row_index[index_submat]++;
-	}
-
-	// Now evaluate for each sub-matrix:
-	std::vector<arma::vec> sub_r(n_submat);
-	sub_r[n_submat - 1] = arma::vec(sizes_sub_matrices[n_submat - 1], arma::fill::zeros);
-	for(size_t i_leaf = 0; i_leaf < n_submat - 1; i_leaf++){
-		// The formula is now:
-		// f(x) = sum_{i in containingBoxes} f[i](x) * w[i](x) / (sum_{i in containingBoxes} w[i](x) )
-		if(sizes_sub_matrices[i_leaf] > 0)
-		{
-			arma::vec denominator(sizes_sub_matrices[i_leaf], arma::fill::zeros);
-			arma::vec nominator(sizes_sub_matrices[i_leaf], arma::fill::zeros);
-
-			for(size_t i_dom: domains_intersect_leafs[i_leaf])
-			{
-				nominator   += sub_sfx[i_dom](sub_matrix[i_leaf])
-						% weight_fcts[i_dom](sub_matrix[i_leaf], sub_domains[i_dom].center);
-				denominator += weight_fcts[i_dom](sub_matrix[i_leaf], sub_domains[i_dom].center);
-			}
-
-			sub_r[i_leaf] = nominator / denominator;
-		}
-	}
-
-
-	// Construct return-vector:
-	arma::vec r(Y.n_rows, arma::fill::zeros);
-
-	for(size_t i_mat = 0; i_mat < orig_indices.size(); i_mat++)
-	{
-		for(size_t i_row = 0; i_row < orig_indices[i_mat].size(); i_row++)
-		{
-			r(orig_indices[i_mat][i_row]) = sub_r[i_mat](i_row);
-		}
-	}
-
-	return r;
 }

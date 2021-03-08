@@ -42,9 +42,9 @@ public:
 	wendland( const wendland&  ) = default;
 	wendland(       wendland&& ) = default;
 
-	// Assignment does not make any sense.
-	wendland& operator=( const wendland&  ) = delete;
-	wendland& operator=(       wendland&& ) = delete;
+	// Assignment doesn't do anything
+	wendland& operator=( const wendland&  ) { return *this; }
+	wendland& operator=(       wendland&& ) { return *this; }
 
 
 	// The heart of the matter: evaluation.

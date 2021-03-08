@@ -19,42 +19,72 @@
 
 #include <iostream>
 
-#include <vlasovius/trees/kd_tree.h>
+#include <vlasovius/geometry/kd_tree.h>
+#include <vlasovius/geometry/bounding_box.h>
 #include <vlasovius/misc/stopwatch.h>
 
 int main()
 {
-	size_t N = 1e2;
+	size_t N = 1e6; size_t min_per_box = 400;
 	arma::mat points(N, 2, arma::fill::randu);
-	arma::vec rhs(N, arma::fill::randu);
-
-	//std::cout << points << std::endl;
 
 	vlasovius::misc::stopwatch watch;
-	vlasovius::trees::kd_tree baum(points, rhs, 10, 20);
-	double zeit = watch.elapsed();
+	vlasovius::geometry::kd_tree baum(points);
+	double zeit { watch.elapsed() };
 	std::cout << "Speedy speed: " << zeit << std::endl;
-	std::cout << "Number nodes: " << baum.get_number_nodes() << std::endl;
-	std::cout << "Number leafs: " << baum.getNumberLeafs() << std::endl;
 
-	arma::mat test_points(N, 2, arma::fill::randu);
-	test_points *= 1.1;
+	watch.reset();
+	arma::mat cover = baum.covering_boxes(min_per_box);
+	zeit = watch.elapsed();
+	std::cout << "Time for computing covering: " << zeit << std::endl;
+	std::cout << "Size of covering: " << cover.n_rows << std::endl;
 
-	/*
-	for(size_t i = 0; i < N; i++)
+	double max_zeit = 0, total_zeit = 0;
+	for ( size_t i = 0; i < cover.n_rows; ++i )
 	{
-		int j = baum.whichLeafContains(test_points.row(i));
-		std::cout << "Leaf " << j << " contains " << test_points.row(i) << std::endl;
-	}
+		arma::rowvec box = cover.row(i);
+		watch.reset();
+		arma::uvec idx = baum.index_query( box );
+		zeit = watch.elapsed();
+		max_zeit = std::max(zeit,max_zeit);
+		total_zeit += zeit;
 
+		if ( idx.size() < min_per_box && ! (N > min_per_box) )
+		{
+			std::cout << "Error! Number of results in box is smaller than min_per_box!";
+			return -2;
+		}
+		std::vector<arma::uword> myidx;
+		for ( size_t j = 0; j < N; ++j )
+		{
+			arma::rowvec p = points.row(j);
+			if ( vlasovius::geometry::bounding_box::contains_point(box,p) )
+			{
+				myidx.push_back(j);
+			}
+		}
 
-	for(size_t i = 0; i < baum.get_number_nodes(); i++)
-	{
-		std::cout << "Node " << i << std::endl;
-		std::cout << baum.getNode(i).box.center << std::endl;
-		std::cout << baum.getNode(i).box.sidelength << std::endl;
+		if ( myidx.size() != idx.size() )
+		{
+			std::cout << "Error! Results of kd_tree and exhaustive search differ.";
+			return -1;
+		}
+
+		std::sort( myidx.begin(), myidx.end() );
+		std::sort(   idx.begin(),   idx.end() );
+
+		for ( size_t j = 0; j < myidx.size(); ++j )
+		{
+			if ( idx[j] != myidx[j] )
+			{
+				std::cout << "Error! Results of kd_tree and exhaustive search differ.";
+				return -1;
+			}
+		}
 	}
-	*/
+	std::cout << "Maximum query time: " << max_zeit << std::endl;
+	std::cout << "Average query time: " << total_zeit/cover.n_rows << std::endl;
+
 	return 0;
 }
 
