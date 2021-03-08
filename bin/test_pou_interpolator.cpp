@@ -198,10 +198,10 @@ int main()
 	constexpr size_t dim { 2 }, k { 4 };
 	constexpr size_t Nx { 100 };
 	constexpr size_t Nv { 100 };
-	constexpr size_t eval_Nx { 500 };
-	constexpr size_t eval_Nv { 500 };
-	constexpr size_t N { Nx * Nv };
-	constexpr double tikhonov_mu { 1e-9 };
+	constexpr size_t eval_Nx { 100 };
+	constexpr size_t eval_Nv { 100 };
+	constexpr size_t N { (Nx + 1) * (Nv + 1) };
+	constexpr double tikhonov_mu { 0 };
 	constexpr size_t min_per_box = 100;
 	constexpr size_t max_per_box = 200;
 	constexpr double enlarge = 1.5;
@@ -254,7 +254,7 @@ int main()
 		{
 			double x = plotX(j + (eval_Nx + 1)*i,0) = L * i/double(eval_Nx);
 			double y = plotX(j + (eval_Nx + 1)*i,1) = 20.0 * j/double(eval_Nv) - 10.0;
-			plotf_true(j + 101*i) = 0.39894228040143267793994 * ( 1 + 0.01 * std::cos(0.5*x) )
+			plotf_true(j + eval_Nx*i) = 0.39894228040143267793994 * ( 1 + 0.01 * std::cos(0.5*x) )
 						* std::exp( - y * y /2 );
 		}
 
@@ -269,10 +269,11 @@ int main()
 	{
 		for ( size_t j = 0; j <= eval_Nv; ++j )
 		{
-			double x = plotX(j + (eval_Nx + 1)*i,0);
-			double y = plotX(j + (eval_Nx + 1)*i,1);
-			double f  = plotf(j+(eval_Nx + 1)*i) - plotf_true(j+(eval_Nx + 1)*i);
-			str << x << " " << y << " " << f << std::endl;
+			double x = plotX(j + (eval_Nx + 1) * i, 0);
+			double y = plotX(j + (eval_Nx + 1) * i, 1);
+			double value  = plotf(j + (eval_Nx + 1) * i);
+					//- plotf_true(j + (eval_Nx + 1) * i);
+			str << x << " " << y << " " << value << std::endl;
 		}
 		str << "\n";
 	}
