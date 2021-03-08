@@ -36,7 +36,7 @@ template <size_t k1, size_t k2>
 class xv_kernel
 {
 public:
-	xv_kernel() = delete;
+	xv_kernel() = default;
 	xv_kernel( double sigma_x, double sigma_v, double L );
 
 	arma::mat operator()( const arma::mat &xv1, const arma::mat &xv2 ) const;
@@ -214,7 +214,6 @@ int main()
 	kernel_t K( sigma_x, sigma_v, L );
 	size_t Nx = 20, Nv = 80;
 
-/*
 	size_t num_threads = omp_get_max_threads();
 
 	// Runge--Kutta Butcher tableau.
@@ -320,7 +319,7 @@ int main()
 
 		if ( t + dt > T ) dt = T - t;
 	}
-	*/
+
 }
 
 
