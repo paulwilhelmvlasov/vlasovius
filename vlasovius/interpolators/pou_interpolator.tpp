@@ -21,7 +21,7 @@
 template <size_t k>
 vlasovius::interpolators::pou_inducing_kernel<k>::pou_inducing_kernel( const arma::rowvec& sigma )
 {
-	size_t d = sigma.size();
+	size_t d = sigma.n_cols;
 	dim_kernels.reserve(d);
 
 	for(size_t i = 0; i < d; i++)
@@ -69,16 +69,9 @@ void vlasovius::interpolators::pou_interpolator<kernel>::construct_sub_sfx(arma:
 	// (Note that usually there are approximately twice as many nodes as leafs
 	// so just running through all nodes and checking on leaf-status might have
 	// the optimal run-time.)
-	size_t n_nodes = tree.get_number_nodes();
 	size_t n_leafs = tree.getNumberLeafs();
 
-	indices_leafs.reserve(n_leafs);
-
-	for(size_t i = 0; i < n_nodes; i++){
-		if(tree.getNode(i).isLeaf()){
-			indices_leafs.push_back(i);
-		}
-	}
+	indices_leafs = tree.get_indices_leafs();
 
 	// Get the point-sets for each sub-sfx and compute the bounding-box. Note that
 	// I have to enlarge the boxes of each leaf such that they slightly overlap.
@@ -86,8 +79,8 @@ void vlasovius::interpolators::pou_interpolator<kernel>::construct_sub_sfx(arma:
 	std::vector<std::deque<arma::uword>> indices_points(n_leafs);
 	sub_domains = std::vector<vlasovius::trees::bounding_box>(n_leafs);
 
-	#pragma omp parallel for
-	for(size_t i = 0; i < n_leafs; i++) // Can I pragma parallel for this?
+	//#pragma omp parallel for
+	for(size_t i = 0; i < n_leafs; i++)
 	{
 		size_t index_node = indices_leafs[i];
 		vlasovius::trees::node leaf_nd = tree.getNode(index_node);
@@ -106,7 +99,6 @@ void vlasovius::interpolators::pou_interpolator<kernel>::construct_sub_sfx(arma:
 		// Compute new bounding-box:
 		sub_domains[i] = leaf_nd.box;
 		sub_domains[i].sidelength *= enlargement_factor;
-
 		// Find now all points intersecting the new bounding-box:
 		// Therefore first find the parent-node which completely contains the sub-domain
 		// and check child-points on intersection.
@@ -224,21 +216,22 @@ arma::vec vlasovius::interpolators::pou_interpolator<kernel>::operator()( const 
 	// Now evaluate for each sub-matrix:
 	std::vector<arma::vec> sub_r(n_submat);
 	sub_r[n_submat - 1] = arma::vec(sizes_sub_matrices[n_submat - 1], arma::fill::zeros);
-	for(size_t i = 0; i < n_submat - 1; i++){
+	for(size_t i_leaf = 0; i_leaf < n_submat - 1; i_leaf++){
 		// The formula is now:
 		// f(x) = sum_{i in containingBoxes} f[i](x) * w[i](x) / (sum_{i in containingBoxes} w[i](x) )
-		if(sizes_sub_matrices[i] > 0)
+		if(sizes_sub_matrices[i_leaf] > 0)
 		{
-			arma::vec denominator(sizes_sub_matrices[i], arma::fill::zeros);
-			arma::vec nominator(sizes_sub_matrices[i], arma::fill::zeros);
+			arma::vec denominator(sizes_sub_matrices[i_leaf], arma::fill::zeros);
+			arma::vec nominator(sizes_sub_matrices[i_leaf], arma::fill::zeros);
 
-			for(size_t j: domains_intersect_leafs[i])
+			for(size_t i_dom: domains_intersect_leafs[i_leaf])
 			{
-				nominator   += sub_sfx[j](sub_matrix[i]) % weight_fcts[j](sub_domains[j].center, sub_matrix[i]);
-				denominator += weight_fcts[j](sub_domains[j].center, sub_matrix[i]);
+				nominator   += sub_sfx[i_dom](sub_matrix[i_leaf])
+						% weight_fcts[i_dom](sub_matrix[i_leaf], sub_domains[i_dom].center);
+				denominator += weight_fcts[i_dom](sub_matrix[i_leaf], sub_domains[i_dom].center);
 			}
 
-			sub_r[i] = nominator / denominator;
+			sub_r[i_leaf] = nominator / denominator;
 		}
 	}
 

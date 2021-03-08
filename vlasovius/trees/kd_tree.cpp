@@ -28,13 +28,20 @@ namespace vlasovius
 
 		bool subset(const bounding_box& first, const bounding_box& second)
 		{
-			// For performance I do not check on size-compatibility:
-			size_t d = second.center.size();
-
-			for(long i = 0; i < d; i++)
+			#ifndef NDEBUG
+			if ( first.center.size() != second.center.size() )
 			{
-				if( (first.center(i) + first.sidelength(i) > second.center(i) + second.sidelength(i))
-				  || (first.center(i) - first.sidelength(i) < second.center(i) - second.sidelength(i)) )
+				throw std::runtime_error { "vlasovius::trees::intersects: "
+										   "Comparison of boxes of differing dimension." };
+			}
+			#endif
+
+			const arma::uword dim { second.center.size() };
+			for( arma::uword d = 0; d < dim; ++d )
+			{
+				double dist = std::abs(first.center(d) - second.center(d)) -
+									  (first.sidelength(d) + second.sidelength(d));
+				if ( dist > 0 )
 				{
 					return false;
 				}
@@ -47,7 +54,7 @@ namespace vlasovius
 		{
 			size_t d = second.center.size();
 
-			for(long i = 0; i < d; i++)
+			for(size_t i = 0; i < d; i++)
 			{
 				double dist = std::abs(first.center(i) - second.center(i));
 				if( dist <= first.sidelength(i) || dist <= second.sidelength(i) )
@@ -77,9 +84,19 @@ namespace vlasovius
 			std::vector<arma::uword> sortedIndices(points.n_rows);
 			std::iota(sortedIndices.begin(), sortedIndices.end(), 0);
 
-			buildTree(sortedIndices, points, 0, minPerBox, maxPerBox);
+			buildTree(sortedIndices, points, rhs, 0, minPerBox, maxPerBox);
 
-			sortPoints(sortedIndices, points, rhs);
+			//sortPoints(sortedIndices, points, rhs);
+
+			indices_leafs.reserve(n_leafs);
+
+			for(size_t i = 0; i < nodes.size(); i++){
+				if(nodes[i].isLeaf()){
+					indices_leafs.push_back(i);
+					node_index_leaf_index.insert({i, indices_leafs.size() - 1});
+				}
+			}
+
 			double elapsed { clock.elapsed() };
 			std::cout << "Time for computing kd-tree: " << elapsed << ".\n";
 		}
@@ -118,7 +135,7 @@ namespace vlasovius
 
 
 		void kd_tree::buildTree(std::vector<arma::uword>& sortedIndices,
-				arma::mat& points, size_t currentNodeIndex,
+				arma::mat& points, arma::vec& rhs, size_t currentNodeIndex,
 				size_t minPerBox, size_t maxPerBox)
 		{
 			// Use the standard splitting rule for kd-trees, i.e.:
@@ -126,6 +143,7 @@ namespace vlasovius
 			// of points and the splitting value is the median of
 			// the respective coordinates of the points in the
 			// current box.
+
 			size_t numIndicesInBox = nodes[currentNodeIndex].indexLastElem
 					- nodes[currentNodeIndex].indexFirstElem;
 			if(numIndicesInBox > maxPerBox && (numIndicesInBox / 2) >= minPerBox){
@@ -146,29 +164,46 @@ namespace vlasovius
 				size_t dimSplit = splittingDimension(currentNodeIndex);
 
 				// Split along the dimension at the correct value:
-				split(sortedIndices, points, currentNodeIndex, dimSplit);
+				split(sortedIndices, points, rhs, currentNodeIndex, dimSplit);
 
 				// Compute boxes for children:
 				nodes[firstChild].box  = nodes[currentNodeIndex].box;
 				nodes[secondChild].box = nodes[currentNodeIndex].box;
 
-				double lowerBorder = points.row(nodes[firstChild].indexFirstElem)(dimSplit);
-				double splitValue  = points.row(nodes[firstChild].indexLastElem - 1)(dimSplit);
-				double upperBorder = points.row(nodes[secondChild].indexLastElem - 1)(dimSplit);
+				double lowerBorder = nodes[currentNodeIndex].box.center(dimSplit)
+						- nodes[currentNodeIndex].box.sidelength(dimSplit);
+				double splitValue  = points.row(nodes[secondChild].indexFirstElem)(dimSplit);
+				double upperBorder = nodes[currentNodeIndex].box.center(dimSplit)
+								+ nodes[currentNodeIndex].box.sidelength(dimSplit);
 
 				double firstSideLength  = (splitValue - lowerBorder) / 2.0;
 				double secondSideLength = (upperBorder - splitValue) / 2.0;
 
+				/*
+				std::cout <<  points.submat(nodes[currentNodeIndex].indexFirstElem, 0,
+							nodes[currentNodeIndex].indexLastElem - 1, dim - 1) << std::endl;
+				std::cout << "parentIndex = " << nodes[currentNodeIndex].parent << std::endl;
+				std::cout << "currentNodeIndex = " << currentNodeIndex << std::endl;
+				std::cout << "center = " << nodes[currentNodeIndex].box.center;
+				std::cout << "sidelength = " << nodes[currentNodeIndex].box.sidelength;
+				std::cout << "dimSplit    = " << dimSplit << std::endl;
+				std::cout << "lowerBorder = " << lowerBorder << std::endl;
+				std::cout << "splitValue  = " << splitValue << std::endl;
+				std::cout << "upperBorder = " << upperBorder << std::endl;
+				std::cout << "firstSidelength  = " << firstSideLength << std::endl;
+				std::cout << "secondSidelength = " << secondSideLength << std::endl;
+				*/
+
 				nodes[firstChild].box.sidelength(dimSplit)  = firstSideLength;
 				nodes[secondChild].box.sidelength(dimSplit) = secondSideLength;
 
-				nodes[firstChild].box.center(dimSplit) -= firstSideLength;
-				nodes[secondChild].box.center(dimSplit) -= secondSideLength;
+				nodes[firstChild].box.center(dimSplit)  = lowerBorder + firstSideLength;
+				nodes[secondChild].box.center(dimSplit) = splitValue + secondSideLength;
 
 				// Start recursion for children:
 				n_leafs++; // 1 leaf-node split into 2 leafs => Increment leaf-count.
-				buildTree(sortedIndices, points, firstChild, minPerBox, maxPerBox);
-				buildTree(sortedIndices, points, secondChild, minPerBox, maxPerBox);
+				buildTree(sortedIndices, points, rhs, firstChild, minPerBox, maxPerBox);
+				buildTree(sortedIndices, points, rhs, secondChild, minPerBox, maxPerBox);
 			}
 		}
 
@@ -201,7 +236,7 @@ namespace vlasovius
 		}
 
 		void kd_tree::split(std::vector<arma::uword>& sortedIndices,
-				arma::mat& points, size_t currentNodeIndex, size_t dimSplit)
+				arma::mat& points, arma::vec& rhs, size_t currentNodeIndex, size_t dimSplit)
 		{
 			arma::uword first = nodes[currentNodeIndex].indexFirstElem;
 			arma::uword last  = nodes[currentNodeIndex].indexLastElem;
@@ -216,16 +251,38 @@ namespace vlasovius
 					sortedIndices.begin() + last,
 					comp);
 
-			nodes[nodes[currentNodeIndex].firstChild].indexFirstElem = first;
-			nodes[nodes[currentNodeIndex].firstChild].indexLastElem = nth;
+			nodes[nodes[currentNodeIndex].firstChild].indexFirstElem  = first;
+			nodes[nodes[currentNodeIndex].firstChild].indexLastElem   = nth;
 
 			nodes[nodes[currentNodeIndex].secondChild].indexFirstElem = nth;
-			nodes[nodes[currentNodeIndex].secondChild].indexLastElem = last;
+			nodes[nodes[currentNodeIndex].secondChild].indexLastElem  = last;
+
+			// The points must be sorted here already:
+			arma::mat sub_mat = points.submat(first, 0, last - 1, dim -1);
+			arma::vec sub_vec = rhs.subvec(first, last - 1);
+
+			for(arma::uword i = first; i < last; i++)
+			{
+				arma::uword new_index = sortedIndices[i] - first;
+				points.row(i) = sub_mat.row(new_index);
+				rhs(i)		  = sub_vec(new_index);
+
+				sortedIndices[i] = i;
+			}
 		}
 
 		bool bounding_box::contains(const arma::rowvec& p) const
 		{
-			return arma::approx_equal( abs(center - p), sidelength, "reldiff", 1e-16);
+			size_t dim = p.n_cols;
+			for(size_t i = 0; i < dim; i++){
+				double dist = std::abs(center(i) - p(i));
+				if(dist > sidelength(i))
+				{
+					return false;
+				}
+			}
+
+			return true;
 		}
 
 		bool node::isLeaf() const
@@ -250,6 +307,11 @@ namespace vlasovius
 			return nodes.at(i);
 		}
 
+		node kd_tree::getLeaf(size_t i) const
+		{
+			return nodes[indices_leafs.at(i)];
+		}
+
 		int kd_tree::whichLeafContains(const arma::rowvec& p) const
 		{
 			if(nodes[0].box.contains(p)){
@@ -258,16 +320,17 @@ namespace vlasovius
 				int index = 0;
 				do
 				{
-					int firstChild = nodes[index].firstChild;
-					int secondChild = nodes[index].secondChild;
-					if( nodes[firstChild].box.contains(p) ){
+					int firstChild = nodes[size_t(index)].firstChild;
+					int secondChild = nodes[size_t(index)].secondChild;
+					if( nodes[size_t(firstChild)].box.contains(p) ){
 						index = firstChild;
 					} else {
 						index = secondChild;
 					}
-				} while( ! nodes[index].isLeaf() );
+				} while( ! nodes[size_t(index)].isLeaf() );
 
-				return index;
+				return node_index_leaf_index.at(size_t(index));
+				// Returns the index of the leaf (in the leaf-list).
 			}else{
 				// Passed point is not inside the tree:
 				return -1;
@@ -283,21 +346,27 @@ namespace vlasovius
 				int index = 0;
 				do
 				{
-					int firstChild = nodes[index].firstChild;
-					int secondChild = nodes[index].secondChild;
-					if( i <= nodes[firstChild].indexLastElem ){
+					int firstChild = nodes[size_t(index)].firstChild;
+					int secondChild = nodes[size_t(index)].secondChild;
+					if( i <= nodes[size_t(firstChild)].indexLastElem ){
 						index = firstChild;
 					} else {
 						index = secondChild;
 					}
-				} while( ! nodes[index].isLeaf() );
+				} while( ! nodes[size_t(index)].isLeaf() );
 
-				return index;
+				return node_index_leaf_index.at(size_t(index));
+				// Returns the index of the leaf (in the leaf-list).
 			}else{
 				// Passed point is not inside the tree:
 				return -1;
 			}
 
+		}
+
+		std::vector<size_t> kd_tree::get_indices_leafs() const
+		{
+			return indices_leafs;
 		}
 
 	}

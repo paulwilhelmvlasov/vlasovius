@@ -196,14 +196,15 @@ int main()
 {
 	constexpr size_t order = 4;
 	using kernel_t        = vlasovius::xv_kernel<order,4>;
-	using interpolator_t  = vlasovius::interpolators::direct_interpolator<kernel_t>;
+	using interpolator_t  = vlasovius::interpolators::pou_interpolator<kernel_t>;
 	using poisson_t       = vlasovius::misc::poisson_gedoens::periodic_poisson_1d<8>;
 
 	using wendland_t = vlasovius::kernels::wendland<1,4>;
 	wendland_t W;
 
-	double L = 4*3.14159265358979323846, sigma_x  = 3, sigma_v = 0.5;
+	double L = 4*3.14159265358979323846, sigma_x  = 3.0, sigma_v = 3.0;
 	kernel_t K( sigma_x, sigma_v, L );
+	size_t Nx = 20, Nv = 80;
 
 
 	size_t num_threads = omp_get_max_threads();
@@ -232,7 +233,6 @@ int main()
 	}
 
 	// Initialise xv.
-	size_t Nx = 20, Nv = 80;
 	xv.set_size( Nx*Nv,2 );
 	f.resize( Nx*Nv );
 	for ( size_t i = 0; i < Nx; ++i )
@@ -248,7 +248,17 @@ int main()
 		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1 + alpha*std::cos(K*x) ) * std::exp( -v*v/2 );
 	}
 
-	double t = 0, T = 100, dt = 1./1.;
+	arma::mat plotX( 101*101, 2 );
+	arma::vec plotf( 101*101 );
+	for ( size_t i = 0; i <= 100; ++i )
+		for ( size_t j = 0; j <= 100; ++j )
+		{
+			plotX(j + 101*i,0) = L * i/100.;
+			plotX(j + 101*i,1) = 20.0 * j/100. - 10.0;
+			plotf(j + 101*i) = 0;
+		}
+
+	double t = 0, T = 100, dt = 1./4.;
 	std::ofstream str("E.txt");
 	while ( t < T )
 	{
@@ -263,14 +273,10 @@ int main()
 			k_xv[ stage ].resize( xv.n_rows, xv.n_cols );
 			k_xv[ stage ].col(0) = xv_stage.col(1);
 
-			interpolator_t sfx( K, xv_stage, f, 0, num_threads );
+			interpolator_t sfx( K, xv_stage, f, 1e-9, 150, 300, 1.5);
 
-			std::cout << "Interpolation error: " << norm(f-K(xv_stage,xv_stage)*sfx.coeffs(),"inf") << std::endl;
-
-			arma::vec rho = arma::vec(rho_points.n_rows,arma::fill::ones) -
-					        2 * W.integral() * sigma_v * K.eval_x( rho_points, xv_stage ) * sfx.coeffs();
-			//arma::vec rho = vlasovius::integrators::num_rho_1d(sfx, rho_points.col(0),
-			//		10.0, 1e-16, num_threads);
+			arma::vec rho = vlasovius::integrators::num_rho_1d(sfx, rho_points.col(0),
+					10.0, 1e-16, num_threads);
 
 			poisson.update_rho( rho );
 
@@ -281,6 +287,18 @@ int main()
 			{
 				str << t << " " << norm(k_xv[stage].col(1),"inf")  << std::endl;
 				std::cout << "Max-norm of E: " << norm(k_xv[stage].col(1),"inf") << "." << std::endl;
+
+				plotf = sfx(plotX);
+				std::ofstream str( "f_" + std::to_string(t) + "s.txt" );
+				for ( size_t i = 0; i <= 100; ++i )
+				{
+					for ( size_t j = 0; j <= 100; ++j )
+					{
+						str << plotX(j + 101*i,0) << " " << plotX(j + 101*i,1)
+								<< " " << plotf(j+101*i) << std::endl;
+					}
+					str << "\n";
+				}
 			}
  		}
 

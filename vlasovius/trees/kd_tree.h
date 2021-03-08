@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <deque>
 #include <iostream>
+#include <map>
 
 #include <armadillo>
 
@@ -54,6 +55,7 @@ namespace vlasovius
 
 			arma::uword indexFirstElem;
 			arma::uword indexLastElem;
+			// This points to the index after the last element!
 
 			bounding_box box;
 
@@ -71,8 +73,11 @@ namespace vlasovius
 			size_t getNumberLeafs() const;
 			size_t get_number_nodes() const;
 			node getNode(size_t i) const;
+			node getLeaf(size_t i) const;
 			int whichLeafContains(const arma::rowvec& p) const;
 			int whichLeafContains(size_t i) const;
+
+			std::vector<size_t> get_indices_leafs() const;
 
 		private:
 
@@ -82,11 +87,11 @@ namespace vlasovius
 
 			// Tree-build methods:
 			void buildTree(std::vector<arma::uword>& sortedIndices,
-					arma::mat& points, size_t currentNodeIndex,
+					arma::mat& points, arma::vec& rhs, size_t currentNodeIndex,
 					size_t minPerBox, size_t maxPerBox);
 			size_t splittingDimension(size_t currentNodeIndex);
 			void split(std::vector<arma::uword>& sortedIndices,
-					arma::mat& points, size_t currentNodeIndex,
+					arma::mat& points, arma::vec& rhs, size_t currentNodeIndex,
 					size_t dimSplit);
 
 		private:
@@ -95,6 +100,8 @@ namespace vlasovius
 
 			std::deque<node> nodes; // deque to avoid reallocating the underlying array several times
 			// as the struct node might potentially be a large datatype.
+			std::vector<size_t> indices_leafs;
+			std::map<size_t, size_t> node_index_leaf_index;
 		};
 
 	}
