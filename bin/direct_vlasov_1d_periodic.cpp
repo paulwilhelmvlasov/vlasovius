@@ -248,7 +248,7 @@ int main()
 		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1 + alpha*std::cos(K*x) ) * std::exp( -v*v/2 );
 	}
 
-	double t = 0, T = 100, dt = 1./1.;
+	double t = 0, T = 100, dt = 1./8.;
 	std::ofstream str("E.txt");
 	while ( t < T )
 	{

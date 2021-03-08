@@ -195,6 +195,7 @@ void xv_kernel<k1,k2>::eval( size_t /* dim */, size_t n, size_t m,
 int main()
 {
 	constexpr size_t order = 4;
+	//using kernel_t        = vlasovius::kernels::rbf_kernel<vlasovius::kernels::wendland<2,4>>; //vlasovius::xv_kernel<order,4>;
 	using kernel_t        = vlasovius::xv_kernel<order,4>;
 	using interpolator_t  = vlasovius::interpolators::pou_interpolator<kernel_t>;
 	using poisson_t       = vlasovius::misc::poisson_gedoens::periodic_poisson_1d<8>;
@@ -202,17 +203,14 @@ int main()
 	using wendland_t = vlasovius::kernels::wendland<1,4>;
 	wendland_t W;
 
-	constexpr size_t dim { 2 }, k { 4 };
-	constexpr size_t N { 1'000'000 };
 	constexpr double tikhonov_mu { 1e-12 };
 	constexpr size_t min_per_box = 100;
-	constexpr double enlarge = 1.5;
-	arma::rowvec bounding_box { 0, 0, 1, 1 };
+	constexpr double enlarge = 1.3;
 
-
-	double L = 4*3.14159265358979323846, sigma_x  = 3.0, sigma_v = 3.0;
+	double L = 4*3.14159265358979323846, sigma_x  = 4.0, sigma_v = 8.0;
+	arma::rowvec bounding_box { 0, -10.0, L, 10.0 };
 	kernel_t K( sigma_x, sigma_v, L );
-	size_t Nx = 20, Nv = 80;
+	size_t Nx = 100, Nv = 200;
 
 	size_t num_threads = omp_get_max_threads();
 
@@ -265,7 +263,7 @@ int main()
 			plotf(j + 101*i) = 0;
 		}
 
-	double t = 0, T = 100, dt = 1./4.;
+	double t = 0, T = 100, dt = 1./8.;
 	std::ofstream str("E.txt");
 	while ( t < T )
 	{
@@ -280,10 +278,12 @@ int main()
 			k_xv[ stage ].resize( xv.n_rows, xv.n_cols );
 			k_xv[ stage ].col(0) = xv_stage.col(1);
 
+			xv_stage.col(0) -= L * floor(xv_stage.col(0) / L);
+
 			interpolator_t sfx { K, xv_stage, f, bounding_box, enlarge, min_per_box, tikhonov_mu };
 
 			arma::vec rho = vlasovius::integrators::num_rho_1d(sfx, rho_points.col(0),
-					10.0, 1e-16, num_threads);
+					10.0, 1e-13, num_threads);
 
 			poisson.update_rho( rho );
 

@@ -196,18 +196,15 @@ void xv_kernel<k1,k2>::eval( size_t /* dim */, size_t n, size_t m,
 int main()
 {
 	constexpr size_t dim { 2 }, k { 4 };
-	constexpr size_t N { 1'000'000 };
-	constexpr double tikhonov_mu { 1e-12 };
+	constexpr size_t N { 10000 };
+	constexpr double tikhonov_mu { 1e-13 };
 	constexpr size_t min_per_box = 100;
 	constexpr double enlarge = 1.5;
-	constexpr double twopi { 2*3.1415926535 };
 
 	constexpr double L { 4.0 * 3.1415926535};
 
 	std::cout << "N = " << N << std::endl;
 	std::cout << "min per Box = " << min_per_box << std::endl;
-
-	constexpr size_t order = 4;
 
 	using wendland_t     = vlasovius::kernels::wendland<dim,k>;
 	//using kernel_t       = vlasovius::xv_kernel<order,4>;
@@ -216,7 +213,7 @@ int main()
 
 	arma::mat X( N, 2, arma::fill::randu );
 	X.col(0) = L * X.col(0);
-	X.col(1) = 20.0 * X.col(1) - 10.0;
+	X.col(1) = 20.0 * X.col(1) - 10.0 * arma::vec(N, arma::fill::ones);
 	arma::vec f( N );
 	for ( size_t i = 0; i < N; ++i )
 	{
@@ -226,7 +223,7 @@ int main()
 				* std::exp( - y * y /2 );
 	}
 
-	arma::rowvec bounding_box { 0, 0, 1, 1 };
+	arma::rowvec bounding_box { 0, -10.0, L, 10.0 };
 	vlasovius::misc::stopwatch clock;
 	kernel_t K { wendland_t {}, 0.5 };
 	interpolator_t sfx { K, X, f, bounding_box, enlarge, min_per_box, tikhonov_mu };
@@ -239,14 +236,15 @@ int main()
 	std::cout << "Time for evaluating interpolation error: " << elapsed << ".\n";
 
 
-	arma::mat plotX( 1001*1001, 2 );
-	arma::vec plotf_true( 1001*1001 );
-	for ( size_t i = 0; i <= 1000; ++i )
-		for ( size_t j = 0; j <= 1000; ++j )
+	arma::mat plotX( 201*201, 2 );
+	arma::vec plotf_true( 201*201 );
+	for ( size_t i = 0; i <= 200; ++i )
+		for ( size_t j = 0; j <= 200; ++j )
 		{
-			double x = plotX(j + 1001*i,0) = i/1000.;
-			double y = plotX(j + 1001*i,1) = j/1000.;
-			plotf_true(j + 1001*i) = std::sin(twopi*x)*std::sin(twopi*y);
+			double x = plotX(j + 201*i,0) =  L * i/200.;
+			double y = plotX(j + 201*i,1) = 20.0 * j/200. - 10.0;
+			plotf_true(j + 201*i) = 0.39894228040143267793994 * ( 1 + 0.01*std::cos(0.5*x) )
+						* std::exp( - y * y /2 );
 		}
 
 	clock.reset();
@@ -256,13 +254,13 @@ int main()
 	std::cout << "Maximum encountered error at plotting points: " << norm(plotf-plotf_true,"inf") << ".\n";
 
 	std::ofstream str( "test_pou_interpolator.txt" );
-	for ( size_t i = 0; i <= 1000; ++i )
+	for ( size_t i = 0; i <= 200; ++i )
 	{
-		for ( size_t j = 0; j <= 1000; ++j )
+		for ( size_t j = 0; j <= 200; ++j )
 		{
-			double x = plotX(j + 1001*i,0);
-			double y = plotX(j + 1001*i,1);
-			double err  = plotf(j+1001*i)-plotf_true(j+1001*i);
+			double x = plotX(j + 201*i,0);
+			double y = plotX(j + 201*i,1);
+			double err  = plotf(j+201*i);//-plotf_true(j+201*i);
 			str << x << " " << y << " " << err << std::endl;
 		}
 		str << "\n";
