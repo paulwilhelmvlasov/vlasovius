@@ -17,7 +17,6 @@
  * vlasovius; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
 
-
 namespace vlasovius
 {
 
@@ -35,8 +34,6 @@ template <size_t dim, size_t k, typename simd_t>
 wendland<dim,k,simd_t>::wendland()
 {
 	wendland_impl::compute_coefficients( dim, k, c, &integral_ );
-	for ( size_t i = 0; i < (dim/2) + 3*k + 2; ++i )
-		cc[i] = c[i];
 }
 
 template <size_t dim, size_t k, typename simd_t>
@@ -68,15 +65,16 @@ simd_t wendland<dim,k,simd_t>::operator()( simd_t r ) const noexcept
 	constexpr size_t N { (dim/2) + 3*k + 2 };
 
 	r = abs(r);
-	simd_t fhalf  { r+r-1.0 }, f { fhalf + fhalf };
-	simd_t z_prev { cc[0] },   z { fmadd(f,cc[0],cc[1]) };
+	r = r + r - 1.0; r = r + r;
+	simd_t z_prev { c[0] }, z { fmadd(r,c[0],c[1]) };
 	for ( size_t i = 2; i < N-1; ++i )
 	{
-		simd_t tmp = fmadd(f,z,cc[i])-z_prev;
+		simd_t tmp = fmadd(r,z,c[i])-z_prev;
 		z_prev = z;
 		z      = tmp;
 	}
-	z = (fmadd(fhalf,z,cc[N-1]) - z_prev) & less_than( r, 1.0 );
+	r = 0.5*r;
+	z = (fmadd(r,z,c[N-1]) - z_prev) & less_than(r,1.0);
 
 	return z;
 }
@@ -108,9 +106,51 @@ void wendland<dim,k,simd_t>::eval( double *__restrict__ result, size_t n ) const
 		result[i] = (*this)( result[i] );
 }
 
+template <size_t dim, size_t k, typename simd_t>
+void wendland<dim,k,simd_t>::eval( simd_t r[ vecsize ] ) const noexcept
+{
+	constexpr size_t N { (dim/2) + 3*k + 2 };
+	simd_t tmp, c_tmp, z[ vecsize ], z_prev[ vecsize ];
+
+	tmp.fill(1.0);
+	for ( size_t l = 0; l < vecsize; ++l )
+	{
+		r[l] = abs(r[l]);
+		r[l] = r[l] + r[l] - tmp;
+		r[l] = r[l] + r[l];
+	}
+
+	tmp.fill(c[0]); c_tmp.fill(c[1]);
+	for ( size_t l = 0; l < vecsize; ++l )
+	{
+		z_prev[l] = tmp;
+		z[l] = fmadd(r[l],tmp,c_tmp);
+	}
+
+	for ( size_t i = 2; i < N-1; ++i )
+	{
+		c_tmp.fill(c[i]);
+		for ( size_t l = 0; l < vecsize; ++l )
+		{
+			tmp = fmadd(r[l],z[l],c_tmp)-z_prev[l];
+			z_prev[l] = z[l];
+			z[l]      = tmp;
+		}
+	}
+
+	tmp.fill(0.5);
+	for ( size_t l = 0; l < vecsize; ++l ) r[l] = tmp*r[l];
+
+	c_tmp.fill(c[N-1]);
+	for ( size_t l = 0; l < vecsize; ++l ) z[l] = fmadd(r[l],z[l],c_tmp) - z_prev[l];
+
+	tmp.fill(1.0);
+	for ( size_t l = 0; l < vecsize; ++l ) r[l] = z[l] & less_than(r[l],tmp);
+}
+
 /*!
  * \brief Computes the integral of the Wendland function over the positive reals.
- * \int_{0}^{\infty} W(r)\,{\mathrm dr} = \int_{0}^{1} W(r)\,{\mathrm dr}.
+ * \int_{0}^{\infty} W(r)\,{\mathrm dr} = \int_{0}^{1} W(r)\,{\mathrm d}r.
  */
 template <size_t dim, size_t k, typename simd_t> inline
 double wendland<dim,k,simd_t>::integral() const noexcept

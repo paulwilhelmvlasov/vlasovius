@@ -32,8 +32,8 @@ template <size_t dim, size_t k, typename simd_t = ::vlasovius::misc::simd<double
 class wendland
 {
 public:
-
 	using simd_type = simd_t;
+	static constexpr size_t vecsize = simd_t::size();
 
 	wendland();
 
@@ -53,11 +53,11 @@ public:
 	arma::vec operator()( arma::vec r ) const;
 
 	void eval( double *r, size_t n ) const noexcept;
+	void eval( simd_t  r[vecsize] )  const noexcept;
 
 	double integral() const noexcept;
 
 private:
-	simd_t  cc[ (dim/2) + 3*k + 2 ];
 	double  c [ (dim/2) + 3*k + 2 ];
 	double  integral_;
 };

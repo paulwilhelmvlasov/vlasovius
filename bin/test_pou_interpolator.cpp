@@ -48,8 +48,9 @@ int main()
 	}
 
 	arma::rowvec bounding_box { 0, 0, 1, 1 };
-	vlasovius::misc::stopwatch clock;
+
 	kernel_t K { wendland_t {}, 0.5 };
+	vlasovius::misc::stopwatch clock;
 	interpolator_t sfx { K, X, f, bounding_box, enlarge, min_per_box, tikhonov_mu };
 	double elapsed { clock.elapsed() };
 	std::cout << "Time for computing RBF-Approximation: " << elapsed << ".\n";

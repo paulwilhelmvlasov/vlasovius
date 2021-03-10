@@ -32,8 +32,8 @@ class kd_tree
 public:
 	kd_tree( const arma::mat &p_X );
 
-	arma::mat  point_query( const arma::rowvec &q ) const;
-	arma::uvec index_query( const arma::rowvec &q ) const;
+	arma::mat  point_query( const arma::rowvec &query_box ) const;
+	arma::uvec index_query( const arma::rowvec &query_box ) const;
 
 	arma::mat  covering_boxes( size_t min_per_box ) const;
 

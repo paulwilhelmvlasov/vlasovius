@@ -22,6 +22,7 @@
 #include <vlasovius/geometry/bounding_box.h>
 
 #include <vlasovius/kernels/wendland.h>
+#include <vlasovius/misc/stopwatch.h>
 
 namespace vlasovius
 {
@@ -69,8 +70,12 @@ arma::mat pou_interpolator<kernel>::operator()( const arma::mat &Y ) const
 	static vlasovius::kernels::wendland<2,4> W;
 
 	size_t dim { Y.n_cols };
+	vlasovius::misc::stopwatch clock;
 	vlasovius::geometry::kd_tree tree { Y };
+	double elapsed = clock.elapsed();
+	std::cout << "Time for tree: " << elapsed << ".\n";
 
+	clock.reset();
 	arma::mat result   ( Y.n_rows, nrhs, arma::fill::zeros );
 	arma::vec weightsum( Y.n_rows,       arma::fill::zeros );
 	#pragma omp parallel
@@ -116,6 +121,9 @@ arma::mat pou_interpolator<kernel>::operator()( const arma::mat &Y ) const
 
 	for ( size_t i = 0; i < result.n_rows; ++i )
 		result.row(i) *= 1./weightsum(i);
+
+	elapsed = clock.elapsed();
+	std::cout << "Time for evaluation: " << elapsed << ".\n";
 
 	return result;
 }
