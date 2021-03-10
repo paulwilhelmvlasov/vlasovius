@@ -41,12 +41,21 @@ nrhs { f.n_cols }
 	geometry::kd_tree tree(X);
 	cover = tree.covering_boxes(min_per_box);
 
+	// Written for only the first dimension beeing periodic. Change this if you want to
+	// use it for higher dimensions also!
+	// Also I assume now that the x-dimension is [0, L].
+	double L = bounding_box(dim);
+
 	local_interpolants.resize(cover.n_rows);
 
 	size_t count { 0 };
 	#pragma omp parallel for reduction(+:count)
 	for ( size_t i = 0; i < cover.n_rows; ++i )
 	{
+		// First get the intersection points in [0, L] with the box.
+		// Then compute the intersections in [-L, 0] and [L, 2L].
+		// Add these to the direct interpolant.
+
 		arma::rowvec bounds = intersection( bounding_box, cover.row(i) );
 		for ( size_t d = 0; d < dim; ++d )
 		{
@@ -58,7 +67,27 @@ nrhs { f.n_cols }
 		cover.row(i) = bounds;
 
 		arma::uvec idx = tree.index_query(bounds);
-		local_interpolants[i] = direct_interpolator<kernel>( K, X.rows(idx), f.rows(idx), tikhonov_mu );
+
+		arma::rowvec left_bounds = bounds;
+		left_bounds(0) 	 -= L;
+		left_bounds(dim) -= L;
+		arma::uvec left_idx = tree.index_query(left_bounds);
+		arma::rowvec right_bounds = bounds;
+		right_bounds(0)   += L;
+		right_bounds(dim) += L;
+		arma::uvec right_idx = tree.index_query(right_bounds);
+
+		arma::uword n_idx = idx.n_rows;
+		arma::uword n_left_idx = left_idx.n_rows;
+		arma::uword n_right_idx = right_idx.n_rows;
+
+		arma::mat pt_mat = arma::join_vert(X.rows(idx), X.rows(left_idx), X.rows(right_idx));
+		pt_mat.col(0).subvec(n_idx, n_idx + n_left_idx - 1) -= L * arma::vec(n_left_idx, arma::fill::ones);
+		pt_mat.col(0).subvec(n_idx + n_left_idx, n_idx + n_left_idx  + n_right_idx - 1)
+				-= L * arma::vec(n_right_idx, arma::fill::ones);
+
+		arma::mat rhs =  arma::join_vert(f.rows(idx), f.rows(left_idx), f.rows(right_idx));
+		local_interpolants[i] = direct_interpolator<kernel>( K, pt_mat, rhs, tikhonov_mu );
 		count += idx.size();
 	}
 	std::cout << "Number of particles per box: " << double(count) / double(cover.n_rows) << ".\n";
