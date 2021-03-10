@@ -31,7 +31,7 @@ namespace interpolators
 {
 
 template <typename kernel>
-pou_interpolator<kernel>::pou_interpolator( kernel K, const arma::mat &X, const arma::mat &f,
+periodic_pou_interpolator<kernel>::periodic_pou_interpolator( kernel K, const arma::mat &X, const arma::mat &f,
 		                                    arma::rowvec bounding_box, double enlarge,
 											size_t min_per_box, double tikhonov_mu ):
 nrhs { f.n_cols }
@@ -94,7 +94,7 @@ nrhs { f.n_cols }
 }
 
 template <typename kernel>
-arma::mat pou_interpolator<kernel>::operator()( const arma::mat &Y ) const
+arma::mat periodic_pou_interpolator<kernel>::operator()( const arma::mat &Y ) const
 {
 	static vlasovius::kernels::wendland<2,4> W;
 

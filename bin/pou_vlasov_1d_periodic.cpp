@@ -27,6 +27,7 @@
 #include <vlasovius/integrators/gauss_konrod.h>
 #include <vlasovius/interpolators/direct_interpolator.h>
 #include <vlasovius/interpolators/pou_interpolator.h>
+#include <vlasovius/interpolators/periodic_pou_interpolator.h>
 #include <vlasovius/misc/periodic_poisson_1d.h>
 
 namespace vlasovius
@@ -197,7 +198,7 @@ int main()
 	constexpr size_t order = 4;
 	//using kernel_t        = vlasovius::kernels::rbf_kernel<vlasovius::kernels::wendland<2,4>>; //vlasovius::xv_kernel<order,4>;
 	using kernel_t        = vlasovius::xv_kernel<order,4>;
-	using interpolator_t  = vlasovius::interpolators::pou_interpolator<kernel_t>;
+	using interpolator_t  = vlasovius::interpolators::periodic_pou_interpolator<kernel_t>;
 	using poisson_t       = vlasovius::misc::poisson_gedoens::periodic_poisson_1d<8>;
 
 	using wendland_t = vlasovius::kernels::wendland<1,4>;

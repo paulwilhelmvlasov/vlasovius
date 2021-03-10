@@ -16,8 +16,8 @@
  * You should have received a copy of the GNU General Public License along with
  * vlasovius; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
-#ifndef VLASOVIUS_INTERPOLATORS_POU_INTERPOLATOR_H
-#define VLASOVIUS_INTERPOLATORS_POU_INTERPOLATOR_H
+#ifndef VLASOVIUS_INTERPOLATORS_PERIODIC_POU_INTERPOLATOR_H
+#define VLASOVIUS_INTERPOLATORS_PERIODIC_POU_INTERPOLATOR_H
 
 
 #include <armadillo>
@@ -30,10 +30,10 @@ namespace interpolators
 {
 
 template <typename kernel>
-class pou_interpolator
+class periodic_pou_interpolator
 {
 public:
-	pou_interpolator( kernel K, const arma::mat &X, const arma::mat &f,
+	periodic_pou_interpolator( kernel K, const arma::mat &X, const arma::mat &f,
 			          arma::rowvec bounding_box, double enlarge,
 					  size_t min_per_box = 200, double tikhonov_mu = 0 );
 
@@ -49,5 +49,5 @@ private:
 
 }
 
-#include <vlasovius/interpolators/pou_interpolator.tpp>
+#include <vlasovius/interpolators/periodic_pou_interpolator.tpp>
 #endif
