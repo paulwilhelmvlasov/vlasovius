@@ -82,9 +82,15 @@ nrhs { f.n_cols }
 		arma::uword n_right_idx = right_idx.n_rows;
 
 		arma::mat pt_mat = arma::join_vert(X.rows(idx), X.rows(left_idx), X.rows(right_idx));
-		pt_mat.col(0).subvec(n_idx, n_idx + n_left_idx - 1) -= L * arma::vec(n_left_idx, arma::fill::ones);
-		pt_mat.col(0).subvec(n_idx + n_left_idx, n_idx + n_left_idx  + n_right_idx - 1)
+		if(n_left_idx > 0)
+		{
+			pt_mat.col(0).subvec(n_idx, n_idx + n_left_idx - 1) -= L * arma::vec(n_left_idx, arma::fill::ones);
+		}
+		if(n_right_idx > 0)
+		{
+			pt_mat.col(0).subvec(n_idx + n_left_idx, n_idx + n_left_idx  + n_right_idx - 1)
 				-= L * arma::vec(n_right_idx, arma::fill::ones);
+		}
 
 		arma::mat rhs =  arma::join_vert(f.rows(idx), f.rows(left_idx), f.rows(right_idx));
 		local_interpolants[i] = direct_interpolator<kernel>( K, pt_mat, rhs, tikhonov_mu );

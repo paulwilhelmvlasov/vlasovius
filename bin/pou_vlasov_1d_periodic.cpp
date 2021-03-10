@@ -205,13 +205,13 @@ int main()
 	wendland_t W;
 
 	constexpr double tikhonov_mu { 1e-8 };
-	constexpr size_t min_per_box = 200;
+	constexpr size_t min_per_box = 100;
 	constexpr double enlarge = 1.5;
 
 	double L = 4*3.14159265358979323846, sigma_x  = 4.0, sigma_v = 8.0;
 	arma::rowvec bounding_box { 0, -10.0, L, 10.0 };
 	kernel_t K( sigma_x, sigma_v, L );
-	size_t Nx = 100, Nv = 200;
+	size_t Nx = 20, Nv = 30;
 
 	size_t num_threads = omp_get_max_threads();
 
