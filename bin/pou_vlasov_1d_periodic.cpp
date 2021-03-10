@@ -203,9 +203,9 @@ int main()
 	using wendland_t = vlasovius::kernels::wendland<1,4>;
 	wendland_t W;
 
-	constexpr double tikhonov_mu { 1e-12 };
-	constexpr size_t min_per_box = 100;
-	constexpr double enlarge = 1.3;
+	constexpr double tikhonov_mu { 1e-8 };
+	constexpr size_t min_per_box = 200;
+	constexpr double enlarge = 1.5;
 
 	double L = 4*3.14159265358979323846, sigma_x  = 4.0, sigma_v = 8.0;
 	arma::rowvec bounding_box { 0, -10.0, L, 10.0 };
@@ -249,8 +249,8 @@ int main()
 		xv( j + Nv*i, 0 ) = x;
 		xv( j + Nv*i, 1 ) = v;
 		constexpr double alpha = 0.01;
-		constexpr double K     = 0.5;
-		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1 + alpha*std::cos(K*x) ) * std::exp( -v*v/2 );
+		constexpr double k     = 0.5;
+		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) ) * std::exp( -v*v/2. );
 	}
 
 	arma::mat plotX( 101*101, 2 );
@@ -278,12 +278,12 @@ int main()
 			k_xv[ stage ].resize( xv.n_rows, xv.n_cols );
 			k_xv[ stage ].col(0) = xv_stage.col(1);
 
-			xv_stage.col(0) -= L * floor(xv_stage.col(0) / L);
+//			xv_stage.col(0) -= L * floor(xv_stage.col(0) / L);
 
 			interpolator_t sfx { K, xv_stage, f, bounding_box, enlarge, min_per_box, tikhonov_mu };
 
 			arma::vec rho = vlasovius::integrators::num_rho_1d(sfx, rho_points.col(0),
-					10.0, 1e-13, num_threads);
+					10.0, 1e-16, num_threads);
 
 			poisson.update_rho( rho );
 
