@@ -88,7 +88,7 @@ bool is_subset( const arma::rowvec &a, const arma::rowvec &b );
 bool is_subset( size_t dim, const double *a, size_t a_stride,
                             const double *b, size_t b_stride );
 
-// Checks wether box a contains *point* b.
+// Checks whether box a contains *point* b.
 // a is a 2xD-dimensional array, b is a 1xD-dimensional.
 bool contains_point( const arma::rowvec &a, const arma::rowvec &b );
 bool contains_point( size_t dim, const double *a, size_t a_stride,
