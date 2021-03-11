@@ -60,14 +60,14 @@ int main()
 	std::cout << "Maximal interpolation error: " << error << ".\n";
 	std::cout << "Time for evaluating interpolation error: " << elapsed << ".\n";
 
-	arma::mat plotX( 1001*1001, 2 );
-	arma::vec plotf_true( 1001*1001 );
-	for ( size_t i = 0; i <= 1000; ++i )
-		for ( size_t j = 0; j <= 1000; ++j )
+	arma::mat plotX( 101*101, 2 );
+	arma::vec plotf_true( 101*101 );
+	for ( size_t i = 0; i <= 100; ++i )
+		for ( size_t j = 0; j <= 100; ++j )
 		{
-			double x = plotX(j + 1001*i,0) = i/1000.;
-			double y = plotX(j + 1001*i,1) = j/1000.;
-			plotf_true(j + 1001*i) = std::sin(twopi*x)*std::sin(twopi*y);
+			double x = plotX(j + 101*i,0) = i/100.;
+			double y = plotX(j + 101*i,1) = j/100.;
+			plotf_true(j + 101*i) = std::sin(twopi*x)*std::sin(twopi*y);
 		}
 
 	clock.reset();
@@ -77,13 +77,13 @@ int main()
 	std::cout << "Maximum encountered error at plotting points: " << norm(plotf-plotf_true,"inf") << ".\n";
 
 	std::ofstream str( "test_pou_interpolator.txt" );
-	for ( size_t i = 0; i <= 1000; ++i )
+	for ( size_t i = 0; i <= 100; ++i )
 	{
-		for ( size_t j = 0; j <= 1000; ++j )
+		for ( size_t j = 0; j <= 100; ++j )
 		{
-			double x = plotX(j + 1001*i,0);
-			double y = plotX(j + 1001*i,1);
-			double err  = plotf(j+1001*i)-plotf_true(j+1001*i);
+			double x = plotX(j + 101*i,0);
+			double y = plotX(j + 101*i,1);
+			double err  = plotf(j+101*i)-plotf_true(j+101*i);
 			str << x << " " << y << " " << err << std::endl;
 		}
 		str << "\n";
