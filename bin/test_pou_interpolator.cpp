@@ -17,10 +17,13 @@
  * vlasovius; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
 
-#include <vlasovius/interpolators/pou_interpolator.h>
+#include <iostream>
+#include <armadillo>
+
+#include <vlasovius/misc/stopwatch.h>
 #include <vlasovius/kernels/wendland.h>
 #include <vlasovius/kernels/rbf_kernel.h>
-#include <vlasovius/misc/stopwatch.h>
+#include <vlasovius/interpolators/pou_interpolator.h>
 
 int main()
 {

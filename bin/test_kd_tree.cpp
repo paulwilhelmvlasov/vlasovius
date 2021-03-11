@@ -84,6 +84,7 @@ int main()
 	}
 	std::cout << "Maximum query time: " << max_zeit << std::endl;
 	std::cout << "Average query time: " << total_zeit/cover.n_rows << std::endl;
+
 	return 0;
 }
 

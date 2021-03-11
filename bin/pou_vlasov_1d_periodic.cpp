@@ -17,7 +17,6 @@
  * vlasovius; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
 
-#include <cblas.h>
 #include <iostream>
 #include <armadillo>
 
@@ -25,8 +24,10 @@
 #include <vlasovius/kernels/wendland.h>
 #include <vlasovius/kernels/rbf_kernel.h>
 #include <vlasovius/kernels/periodised_kernel.h>
+#include <vlasovius/integrators/gauss_konrod.h>
 #include <vlasovius/interpolators/direct_interpolator.h>
 #include <vlasovius/interpolators/pou_interpolator.h>
+#include <vlasovius/interpolators/periodic_pou_interpolator.h>
 #include <vlasovius/misc/periodic_poisson_1d.h>
 
 namespace vlasovius
@@ -36,7 +37,7 @@ template <size_t k1, size_t k2>
 class xv_kernel
 {
 public:
-	xv_kernel() = delete;
+	xv_kernel() = default;
 	xv_kernel( double sigma_x, double sigma_v, double L );
 
 	arma::mat operator()( const arma::mat &xv1, const arma::mat &xv2 ) const;
@@ -44,15 +45,9 @@ public:
 	arma::mat eval_x( const arma::mat &xv1, const arma::mat &xv2 ) const;
 
 	void eval( size_t dim, size_t n, size_t m,
-			         double *K, size_t ldK,
-	           const double *X, size_t ldX,
-	           const double *Y, size_t ldY, size_t threads = 1 ) const;
-
-	void mul( size_t dim, size_t n, size_t m, size_t nrhs,
-			         double *R, size_t ldK,
-	           const double *X, size_t ldX,
-	           const double *Y, size_t ldY,
-			   const double *C, size_t ldC, size_t threads = 1 ) const;
+			   double *__restrict__ K, size_t ldK,
+	           const double        *X, size_t ldX,
+	           const double        *Y, size_t ldY ) const;
 
 private:
 	kernels::wendland<1,k1> W1;
@@ -136,15 +131,15 @@ arma::mat xv_kernel<k1,k2>::eval_x( const arma::mat &xv1, const arma::mat &xv2 )
 
 template <size_t k1, size_t k2>
 void xv_kernel<k1,k2>::eval( size_t /* dim */, size_t n, size_t m,
-                                   double *K, size_t ldK,
-                             const double *X, size_t ldX,
-                             const double *Y, size_t ldY, size_t threads ) const
+                             double *__restrict__ K, size_t ldK,
+                             const double        *X, size_t ldX,
+                             const double        *Y, size_t ldY ) const
 {
 	using simd_t = ::vlasovius::misc::simd<double>;
 
 	double Linv = 1/L;
 
-	#pragma omp parallel for if(threads>1),num_threads(threads)
+	#pragma omp parallel for
 	for ( size_t j = 0; j < m; ++j )
 	{
 		size_t i = 0;
@@ -196,34 +191,27 @@ void xv_kernel<k1,k2>::eval( size_t /* dim */, size_t n, size_t m,
 	}
 }
 
-template <size_t k1, size_t k2>
-void xv_kernel<k1,k2>::mul( size_t dim, size_t n, size_t m, size_t nrhs,
-		                          double *R, size_t ldR,
-                            const double *X, size_t ldX,
-                            const double *Y, size_t ldY,
-	                        const double *C, size_t ldC, size_t threads ) const
-{
-	arma::mat K( n, m );
-	eval( dim, n, m, K.memptr(), n, X, ldX, Y, ldY, threads );
-	cblas_dgemm( CblasColMajor, CblasNoTrans, CblasNoTrans,
-			     n, nrhs, m, 1.0, K.memptr(), n, C, ldC, 0.0, R, ldR );
-}
-
 }
 
 int main()
 {
 	constexpr size_t order = 4;
+	//using kernel_t        = vlasovius::kernels::rbf_kernel<vlasovius::kernels::wendland<2,4>>; //vlasovius::xv_kernel<order,4>;
 	using kernel_t        = vlasovius::xv_kernel<order,4>;
-	using interpolator_t  = vlasovius::interpolators::direct_interpolator<kernel_t>;
+	using interpolator_t  = vlasovius::interpolators::periodic_pou_interpolator<kernel_t>;
 	using poisson_t       = vlasovius::misc::poisson_gedoens::periodic_poisson_1d<8>;
 
 	using wendland_t = vlasovius::kernels::wendland<1,4>;
 	wendland_t W;
 
-	double L = 4*3.14159265358979323846, sigma_x  = 3, sigma_v = 0.5;
-	kernel_t K( sigma_x, sigma_v, L );
+	constexpr double tikhonov_mu { 1e-8 };
+	constexpr size_t min_per_box = 100;
+	constexpr double enlarge = 1.5;
 
+	double L = 4*3.14159265358979323846, sigma_x  = 4.0, sigma_v = 8.0;
+	arma::rowvec bounding_box { 0, -10.0, L, 10.0 };
+	kernel_t K( sigma_x, sigma_v, L );
+	size_t Nx = 20, Nv = 30;
 
 	size_t num_threads = omp_get_max_threads();
 
@@ -251,7 +239,6 @@ int main()
 	}
 
 	// Initialise xv.
-	size_t Nx = 20, Nv = 80;
 	xv.set_size( Nx*Nv,2 );
 	f.resize( Nx*Nv );
 	for ( size_t i = 0; i < Nx; ++i )
@@ -263,9 +250,19 @@ int main()
 		xv( j + Nv*i, 0 ) = x;
 		xv( j + Nv*i, 1 ) = v;
 		constexpr double alpha = 0.01;
-		constexpr double K     = 0.5;
-		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1 + alpha*std::cos(K*x) ) * std::exp( -v*v/2 );
+		constexpr double k     = 0.5;
+		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) ) * std::exp( -v*v/2. );
 	}
+
+	arma::mat plotX( 101*101, 2 );
+	arma::vec plotf( 101*101 );
+	for ( size_t i = 0; i <= 100; ++i )
+		for ( size_t j = 0; j <= 100; ++j )
+		{
+			plotX(j + 101*i,0) = L * i/100.;
+			plotX(j + 101*i,1) = 20.0 * j/100. - 10.0;
+			plotf(j + 101*i) = 0;
+		}
 
 	double t = 0, T = 100, dt = 1./8.;
 	std::ofstream str("E.txt");
@@ -282,9 +279,13 @@ int main()
 			k_xv[ stage ].resize( xv.n_rows, xv.n_cols );
 			k_xv[ stage ].col(0) = xv_stage.col(1);
 
-			interpolator_t sfx( K, xv_stage, f, 0, num_threads );
-			arma::vec rho = arma::vec(rho_points.n_rows,arma::fill::ones) -
-					        2 * W.integral() * sigma_v * K.eval_x( rho_points, xv_stage ) * sfx.coeffs();
+//			xv_stage.col(0) -= L * floor(xv_stage.col(0) / L);
+
+			interpolator_t sfx { K, xv_stage, f, bounding_box, enlarge, min_per_box, tikhonov_mu };
+
+			arma::vec rho = vlasovius::integrators::num_rho_1d(sfx, rho_points.col(0),
+					10.0, 1e-16, num_threads);
+
 			poisson.update_rho( rho );
 
 			for ( size_t i = 0; i < xv_stage.n_rows; ++i )
@@ -294,6 +295,18 @@ int main()
 			{
 				str << t << " " << norm(k_xv[stage].col(1),"inf")  << std::endl;
 				std::cout << "Max-norm of E: " << norm(k_xv[stage].col(1),"inf") << "." << std::endl;
+
+				plotf = sfx(plotX);
+				std::ofstream str( "f_" + std::to_string(t) + "s.txt" );
+				for ( size_t i = 0; i <= 100; ++i )
+				{
+					for ( size_t j = 0; j <= 100; ++j )
+					{
+						str << plotX(j + 101*i,0) << " " << plotX(j + 101*i,1)
+								<< " " << plotf(j+101*i) << std::endl;
+					}
+					str << "\n";
+				}
 			}
  		}
 
@@ -307,4 +320,7 @@ int main()
 
 		if ( t + dt > T ) dt = T - t;
 	}
+
 }
+
+
