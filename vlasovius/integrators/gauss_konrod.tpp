@@ -99,7 +99,7 @@ double vlasovius::integrators::gauss_konrod_1d
 	double int_gauss  = arma::dot( f_evalf.subvec(0, 6), vlasovius::integrators::w_gauss_7 );
 	double int_konrod = arma::dot( f_evalf, vlasovius::integrators::w_konrod_15 );
 
-	if(std::abs(int_gauss - int_konrod) <= 1e-5)
+	if(std::abs(int_gauss - int_konrod) <= eps)
 	{
 		return int_konrod;
 	}else
