@@ -251,7 +251,7 @@ int main()
 	}
 
 	// Initialise xv.
-	size_t Nx = 20, Nv = 80;
+	size_t Nx = 50, Nv = 100;
 	xv.set_size( Nx*Nv,2 );
 	f.resize( Nx*Nv );
 	for ( size_t i = 0; i < Nx; ++i )
@@ -267,7 +267,7 @@ int main()
 		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1 + alpha*std::cos(K*x) ) * std::exp( -v*v/2 );
 	}
 
-	double t = 0, T = 100, dt = 1./8.;
+	double t = 0, T = 100, dt = 1./4.;
 	std::ofstream str("E.txt");
 	while ( t < T )
 	{

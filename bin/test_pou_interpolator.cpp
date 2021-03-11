@@ -24,6 +24,7 @@
 #include <vlasovius/kernels/wendland.h>
 #include <vlasovius/kernels/rbf_kernel.h>
 #include <vlasovius/interpolators/pou_interpolator.h>
+#include <vlasovius/interpolators/periodic_pou_interpolator.h>
 
 int main()
 {
@@ -39,7 +40,7 @@ int main()
 
 	using wendland_t     = vlasovius::kernels::wendland<dim,k>;
 	using kernel_t       = vlasovius::kernels::rbf_kernel<wendland_t>;
-	using interpolator_t = vlasovius::interpolators::pou_interpolator<kernel_t>;
+	using interpolator_t = vlasovius::interpolators::periodic_pou_interpolator<kernel_t>;
 
 	arma::mat X( N, 2, arma::fill::randu );
 	arma::vec f( N );

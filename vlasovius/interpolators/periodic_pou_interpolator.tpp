@@ -99,7 +99,7 @@ nrhs { f.n_cols }
 template <typename kernel>
 arma::mat periodic_pou_interpolator<kernel>::operator()( const arma::mat &Y, size_t threads ) const
 {
-	static vlasovius::kernels::wendland<2,4> W;
+	static vlasovius::kernels::wendland<2,6> W;
 
 	size_t dim { Y.n_cols };
 	vlasovius::geometry::kd_tree tree { Y };
