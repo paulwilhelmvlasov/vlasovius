@@ -35,14 +35,17 @@ class periodic_pou_interpolator
 public:
 	periodic_pou_interpolator( kernel K, const arma::mat &X, const arma::mat &f,
 			          arma::rowvec bounding_box, double enlarge,
-					  size_t min_per_box = 200, double tikhonov_mu = 0 );
+					  size_t min_per_box = 200, double tikhonov_mu = 0,
+					  size_t threads = 1 );
 
-	arma::mat operator()( const arma::mat &Y ) const;
+	arma::mat operator()( const arma::mat &Y, size_t threads = 1) const;
 
 private:
 	arma::mat cover;
 	size_t nrhs;
 	std::vector< direct_interpolator<kernel> > local_interpolants;
+
+	double L = 1;
 };
 
 }

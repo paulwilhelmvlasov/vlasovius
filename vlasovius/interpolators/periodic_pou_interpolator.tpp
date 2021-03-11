@@ -33,7 +33,7 @@ namespace interpolators
 template <typename kernel>
 periodic_pou_interpolator<kernel>::periodic_pou_interpolator( kernel K, const arma::mat &X, const arma::mat &f,
 		                                    arma::rowvec bounding_box, double enlarge,
-											size_t min_per_box, double tikhonov_mu ):
+											size_t min_per_box, double tikhonov_mu, size_t threads ):
 nrhs { f.n_cols }
 {
 	using ::vlasovius::geometry::bounding_box::intersection;
@@ -44,12 +44,11 @@ nrhs { f.n_cols }
 	// Written for only the first dimension beeing periodic. Change this if you want to
 	// use it for higher dimensions also!
 	// Also I assume now that the x-dimension is [0, L].
-	double L = bounding_box(dim);
+	L = bounding_box(dim);
 
 	local_interpolants.resize(cover.n_rows);
 
-	size_t count { 0 };
-	#pragma omp parallel for reduction(+:count)
+	#pragma omp parallel for if (threads > 1), num_threads(threads)
 	for ( size_t i = 0; i < cover.n_rows; ++i )
 	{
 		// First get the intersection points in [0, L] with the box.
@@ -84,7 +83,7 @@ nrhs { f.n_cols }
 		arma::mat pt_mat = arma::join_vert(X.rows(idx), X.rows(left_idx), X.rows(right_idx));
 		if(n_left_idx > 0)
 		{
-			pt_mat.col(0).subvec(n_idx, n_idx + n_left_idx - 1) -= L * arma::vec(n_left_idx, arma::fill::ones);
+			pt_mat.col(0).subvec(n_idx, n_idx + n_left_idx - 1) += L * arma::vec(n_left_idx, arma::fill::ones);
 		}
 		if(n_right_idx > 0)
 		{
@@ -94,13 +93,11 @@ nrhs { f.n_cols }
 
 		arma::mat rhs =  arma::join_vert(f.rows(idx), f.rows(left_idx), f.rows(right_idx));
 		local_interpolants[i] = direct_interpolator<kernel>( K, pt_mat, rhs, tikhonov_mu );
-		count += idx.size();
 	}
-	std::cout << "Number of particles per box: " << double(count) / double(cover.n_rows) << ".\n";
 }
 
 template <typename kernel>
-arma::mat periodic_pou_interpolator<kernel>::operator()( const arma::mat &Y ) const
+arma::mat periodic_pou_interpolator<kernel>::operator()( const arma::mat &Y, size_t threads ) const
 {
 	static vlasovius::kernels::wendland<2,4> W;
 
@@ -109,37 +106,87 @@ arma::mat periodic_pou_interpolator<kernel>::operator()( const arma::mat &Y ) co
 
 	arma::mat result   ( Y.n_rows, nrhs, arma::fill::zeros );
 	arma::vec weightsum( Y.n_rows,       arma::fill::zeros );
-	#pragma omp parallel
+	#pragma omp parallel if (threads > 1), num_threads(threads)
 	{
 		arma::mat my_result   ( Y.n_rows, nrhs, arma::fill::zeros );
 		arma::vec my_weightsum( Y.n_rows,       arma::fill::zeros );
 		arma::rowvec inv_sigma(dim), centre(dim);
+		arma::rowvec left_inv_sigma(dim), left_centre(dim);
+		arma::rowvec right_inv_sigma(dim), right_centre(dim);
 
 		#pragma omp for schedule(dynamic)
 		for ( size_t i = 0; i < cover.n_rows; ++i )
 		{
-			arma::rowvec box    = cover.row(i);
-			arma::uvec   idx    = tree.index_query( box );
-			if ( idx.size() == 0 )
+			arma::rowvec box    	= cover.row(i);
+			arma::uvec   idx    	= tree.index_query( box );
+
+			arma::rowvec left_box   = box;
+			left_box(0)   -= L;
+			left_box(dim) -= L;
+			arma::uvec   left_idx   = tree.index_query( left_box );
+
+			arma::rowvec right_box  = box;
+			right_box(0)   += L;
+			right_box(dim) += L;
+			arma::uvec   right_idx  = tree.index_query( right_box );
+
+			arma::uword n_idx = idx.n_rows;
+			arma::uword n_left_idx = left_idx.n_rows;
+			arma::uword n_right_idx = right_idx.n_rows;
+
+			if ( n_idx == 0 && n_left_idx == 0 && n_right_idx == 0)
 				continue;
 
-			arma::mat values = local_interpolants[i]( Y.rows(idx) );
+
+			arma::mat Y_eval( Y.rows( arma::join_vert(idx, left_idx, right_idx) ) );
+			if(left_idx.n_rows > 0)
+			{
+				Y_eval.col(0).subvec(n_idx, n_idx + n_left_idx - 1) += L * arma::vec(n_left_idx, arma::fill::ones);
+			}
+			if(right_idx.n_rows > 0)
+			{
+				Y_eval.col(0).subvec(n_idx + n_left_idx, n_idx + n_left_idx  + n_right_idx - 1)
+						-= L * arma::vec(n_right_idx, arma::fill::ones);
+			}
+
+			arma::mat values = local_interpolants[i]( Y_eval );
 
 			for ( size_t d = 0; d < dim; ++d )
 			{
 				inv_sigma(d) = 1./((box(d+dim)-box(d))/2);
 				   centre(d) =     (box(d+dim)+box(d))/2;
+
+				left_inv_sigma(d) = inv_sigma(d);
+				   left_centre(d) =     (left_box(d+dim)+left_box(d))/2;
+
+				right_inv_sigma(d) = inv_sigma(d);
+				   right_centre(d) =     (right_box(d+dim)+right_box(d))/2;
 			}
 
-			arma::vec weights( idx.size() );
+			arma::vec weights( n_idx + n_left_idx + n_right_idx );
 			for ( size_t j = 0; j < idx.size(); ++j )
 			{
 				weights(j) = W( std::abs(Y(idx(j),0)-centre(0))*inv_sigma(0) );
 				for ( size_t d = 1; d < dim; ++d )
 					weights(j) *= W( std::abs(Y(idx(j),d)-centre(d))*inv_sigma(d) );
 			}
+			for( size_t j = n_idx; j < n_idx + n_left_idx; ++j)
+			{
+				weights(j) = W( std::abs(Y(left_idx(j - n_idx),0)-left_centre(0))*left_inv_sigma(0) );
+				for ( size_t d = 1; d < dim; ++d )
+					weights(j) *= W( std::abs(Y(left_idx(j - n_idx),d)
+							- left_centre(d)) * left_inv_sigma(d) );
+			}
+			for( size_t j = n_idx + n_left_idx; j < n_idx + n_left_idx + n_right_idx; ++j)
+			{
+				weights(j) = W( std::abs(Y(right_idx(j - n_idx - n_left_idx),0)
+						- right_centre(0)) * right_inv_sigma(0) );
+				for ( size_t d = 1; d < dim; ++d )
+					weights(j) *= W( std::abs(Y(right_idx(j - n_idx - n_left_idx),d)
+							- right_centre(d)) * right_inv_sigma(d) );
+			}
 
-			   my_result.rows(idx) += weights % values;
+			my_result.rows(idx)    += weights % values;
 			my_weightsum.rows(idx) += weights;
 		}
 
