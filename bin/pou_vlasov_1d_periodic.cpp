@@ -206,7 +206,7 @@ int main()
 	using wendland_t 	  = vlasovius::kernels::wendland<1,4>;
 	wendland_t W;
 
-	constexpr double tikhonov_mu { 1e-7 };
+	constexpr double tikhonov_mu { 1e-13 };
 	constexpr size_t min_per_box = 150;
 	constexpr double enlarge 	 = 1.2;
 
@@ -214,7 +214,7 @@ int main()
 	arma::rowvec bounding_box { 0, -10.0, L, 10.0 };
 
 	//kernel_t K( sigma_x, sigma_v, L );
-	kernel_t K( {}, 2.0 );
+	kernel_t K( {}, 5.0 );
 
 	size_t Nx = 100, Nv = 100;
 

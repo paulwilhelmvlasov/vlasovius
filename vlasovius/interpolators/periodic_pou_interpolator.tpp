@@ -58,8 +58,8 @@ nrhs { f.n_cols }
 		arma::rowvec bounds = intersection( bounding_box, cover.row(i) );
 		for ( size_t d = 0; d < dim; ++d )
 		{
-			double l = (bounds(d+dim) - bounds(d))*enlarge/2;
-			double c = bounds(d) + (bounds(d+dim)-bounds(d))/2;
+			double l = (bounds(d+dim) - bounds(d))*enlarge/2.;
+			double c = bounds(d) + (bounds(d+dim)-bounds(d))/2.;
 			bounds(d    ) = c - l;
 			bounds(d+dim) = c + l;
 		}
