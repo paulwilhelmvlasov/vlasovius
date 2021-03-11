@@ -32,6 +32,8 @@ template <typename rbf_function>
 class rbf_kernel
 {
 public:
+	using simd_t = typename rbf_function::simd_type;
+
 	rbf_kernel( rbf_function p_F = rbf_function {}, double sigma = 1 );
 
 	rbf_kernel( const rbf_kernel&  ) = default;
@@ -41,19 +43,27 @@ public:
 
 	arma::mat operator()( const arma::mat &X, const arma::mat &Y ) const;
 
-
 	void eval( size_t dim, size_t n, size_t m,
-			   double *__restrict__ K, size_t ldK,
-	           const double        *X, size_t ldX,
-	           const double        *Y, size_t ldY, size_t num_threads = 1 ) const;
+			         double *K, size_t ldK,
+	           const double *X, size_t ldX,
+	           const double *Y, size_t ldY, size_t num_threads = 1 ) const;
 
+	void mul ( size_t dim, size_t n, size_t m, size_t nrhs,
+			         double *R, size_t ldK,
+	           const double *X, size_t ldX,
+	           const double *Y, size_t ldY,
+			   const double *C, size_t ldC, size_t num_threads = 1 ) const;
 
 private:
 
 	void eval_column( size_t dim, size_t n, size_t j,
-			          double *__restrict__ K, size_t ldK,
-	                  const double        *X, size_t ldX,
-	                  const double        *Y, size_t ldY ) const;
+			                double *K, size_t ldK,
+	                  const double *X, size_t ldX,
+	                  const double *Y, size_t ldY ) const;
+
+	void micro_kernel( size_t dim, simd_t mat[ simd_t::size() ],
+			           const double *X, size_t ldX,
+	                   const double *Y, size_t ldY ) const;
 
 	rbf_function F   {};
 	double inv_sigma {1};

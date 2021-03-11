@@ -149,29 +149,10 @@ arma::mat direct_interpolator<kernel>::operator()( const arma::mat &Y, size_t th
 	size_t dim = X.n_cols, n = Y.n_rows, m = X.n_rows;
 	arma::mat result( Y.n_rows, coeff.n_cols, arma::fill::zeros );
 
-	if ( threads > 1 )
-	{
-		#pragma omp parallel num_threads(threads)
-		{
-			arma::rowvec tmp( X.n_rows );
-
-			#pragma omp for
-			for ( size_t i = 0; i < Y.n_rows; ++i )
-			{
-				K.eval( dim, m, 1, tmp.memptr(), m, &X(0,0), m, &Y(i,0), n );
-				result.row(i) += tmp*coeff;
-			}
-		}
-	}
-	else
-	{
-		arma::rowvec tmp( X.n_rows );
-		for ( size_t i = 0; i < Y.n_rows; ++i )
-		{
-			K.eval( dim, m, 1, tmp.memptr(), m, &X(0,0), m, &Y(i,0), n );
-			result.row(i) += tmp*coeff;
-		}
-	}
+	K.mul( dim, n, m, coeff.n_cols, result.memptr(), n,
+                                         Y.memptr(), n,
+									     X.memptr(), m,
+	                                 coeff.memptr(), m, threads );
 	return result;
 }
 

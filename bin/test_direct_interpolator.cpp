@@ -16,10 +16,12 @@
  * You should have received a copy of the GNU General Public License along with
  * vlasovius; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
+#include <omp.h>
 #include <cmath>
 #include <fstream>
 #include <iostream>
 #include <armadillo>
+
 
 #include <vlasovius/misc/stopwatch.h>
 #include <vlasovius/kernels/wendland.h>
@@ -33,6 +35,8 @@ int main()
 
 	constexpr double tikhonov_mu { 1e-12 };
 	constexpr double twopi { 2*3.1415926535 };
+
+	size_t threads { (size_t) omp_get_max_threads() };
 
 	using wendland_t     = vlasovius::kernels::wendland<dim,k>;
 	using kernel_t       = vlasovius::kernels::rbf_kernel<wendland_t>;
@@ -48,7 +52,7 @@ int main()
 	}
 
 	vlasovius::misc::stopwatch clock;
-	interpolator_t sfx { kernel_t {}, X, f, tikhonov_mu };
+	interpolator_t sfx { kernel_t {}, X, f, tikhonov_mu, threads };
 	double elapsed { clock.elapsed() };
 	std::cout << "Time for computing RBF-Approximation: " << elapsed << ".\n";
 	std::cout << "Maximal interpolation error: " << norm(f-sfx(X),"inf") << ".\n";
@@ -64,7 +68,7 @@ int main()
 	}
 
 	clock.reset();
-	arma::vec plotf = sfx(plotX);
+	arma::vec plotf = sfx(plotX,threads);
 	elapsed = clock.elapsed();
 	std::cout << "Time for evaluating RBF-approximation at plotting points: " << elapsed << ".\n";
 	std::cout << "Maximum encountered error at plotting points: " << norm(plotf-plotf_true,"inf") << ".\n";

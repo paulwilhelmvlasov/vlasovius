@@ -17,6 +17,7 @@
  * vlasovius; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
 
+#include <cblas.h>
 #include <iostream>
 #include <armadillo>
 
@@ -24,7 +25,6 @@
 #include <vlasovius/kernels/wendland.h>
 #include <vlasovius/kernels/rbf_kernel.h>
 #include <vlasovius/kernels/periodised_kernel.h>
-#include <vlasovius/integrators/gauss_konrod.h>
 #include <vlasovius/interpolators/direct_interpolator.h>
 #include <vlasovius/interpolators/pou_interpolator.h>
 #include <vlasovius/misc/periodic_poisson_1d.h>
@@ -44,9 +44,15 @@ public:
 	arma::mat eval_x( const arma::mat &xv1, const arma::mat &xv2 ) const;
 
 	void eval( size_t dim, size_t n, size_t m,
-			   double *__restrict__ K, size_t ldK,
-	           const double        *X, size_t ldX,
-	           const double        *Y, size_t ldY ) const;
+			         double *K, size_t ldK,
+	           const double *X, size_t ldX,
+	           const double *Y, size_t ldY, size_t threads = 1 ) const;
+
+	void mul( size_t dim, size_t n, size_t m, size_t nrhs,
+			         double *R, size_t ldK,
+	           const double *X, size_t ldX,
+	           const double *Y, size_t ldY,
+			   const double *C, size_t ldC, size_t threads = 1 ) const;
 
 private:
 	kernels::wendland<1,k1> W1;
@@ -130,15 +136,15 @@ arma::mat xv_kernel<k1,k2>::eval_x( const arma::mat &xv1, const arma::mat &xv2 )
 
 template <size_t k1, size_t k2>
 void xv_kernel<k1,k2>::eval( size_t /* dim */, size_t n, size_t m,
-                             double *__restrict__ K, size_t ldK,
-                             const double        *X, size_t ldX,
-                             const double        *Y, size_t ldY ) const
+                                   double *K, size_t ldK,
+                             const double *X, size_t ldX,
+                             const double *Y, size_t ldY, size_t threads ) const
 {
 	using simd_t = ::vlasovius::misc::simd<double>;
 
 	double Linv = 1/L;
 
-	#pragma omp parallel for
+	#pragma omp parallel for if(threads>1),num_threads(threads)
 	for ( size_t j = 0; j < m; ++j )
 	{
 		size_t i = 0;
@@ -188,6 +194,19 @@ void xv_kernel<k1,k2>::eval( size_t /* dim */, size_t n, size_t m,
 			K[ i + j*ldK ] = val;
 		}
 	}
+}
+
+template <size_t k1, size_t k2>
+void xv_kernel<k1,k2>::mul( size_t dim, size_t n, size_t m, size_t nrhs,
+		                          double *R, size_t ldR,
+                            const double *X, size_t ldX,
+                            const double *Y, size_t ldY,
+	                        const double *C, size_t ldC, size_t threads ) const
+{
+	arma::mat K( n, m );
+	eval( dim, n, m, K.memptr(), n, X, ldX, Y, ldY, threads );
+	cblas_dgemm( CblasColMajor, CblasNoTrans, CblasNoTrans,
+			     n, nrhs, m, 1.0, K.memptr(), n, C, ldC, 0.0, R, ldR );
 }
 
 }
@@ -264,14 +283,8 @@ int main()
 			k_xv[ stage ].col(0) = xv_stage.col(1);
 
 			interpolator_t sfx( K, xv_stage, f, 0, num_threads );
-
-			std::cout << "Interpolation error: " << norm(f-K(xv_stage,xv_stage)*sfx.coeffs(),"inf") << std::endl;
-
 			arma::vec rho = arma::vec(rho_points.n_rows,arma::fill::ones) -
 					        2 * W.integral() * sigma_v * K.eval_x( rho_points, xv_stage ) * sfx.coeffs();
-			//arma::vec rho = vlasovius::integrators::num_rho_1d(sfx, rho_points.col(0),
-			//		10.0, 1e-16, num_threads);
-
 			poisson.update_rho( rho );
 
 			for ( size_t i = 0; i < xv_stage.n_rows; ++i )
@@ -295,5 +308,3 @@ int main()
 		if ( t + dt > T ) dt = T - t;
 	}
 }
-
-
