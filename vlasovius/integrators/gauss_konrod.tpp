@@ -64,7 +64,7 @@ template<typename function_1d_xv>
 	arma::vec int_konrod = f_eval_konrod * w_konrod_15;
 	arma::vec int_gauss  = f_eval_gauss * w_gauss_7;
 
-	if(arma::norm(int_konrod - int_gauss, "inf") )
+	if(arma::norm(int_konrod - int_gauss, "inf") <= eps)
 	{
 		return int_konrod;
 	}else

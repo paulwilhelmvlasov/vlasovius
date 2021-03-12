@@ -127,7 +127,7 @@ int main()
 			interpolator_t sfx { K, xv_stage, f, bounding_box, enlarge, min_per_box, tikhonov_mu };
 
 			arma::vec rho = vlasovius::integrators::num_rho_1d(sfx,
-					rho_points.col(0), v_max, 1e-16, num_threads);
+					rho_points.col(0), v_max, 1e-8, num_threads);
 
 			poisson.update_rho( rho );
 
