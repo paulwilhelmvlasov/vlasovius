@@ -99,7 +99,7 @@ nrhs { f.n_cols }
 template <typename kernel>
 arma::mat periodic_pou_interpolator<kernel>::operator()( const arma::mat &Y, size_t threads ) const
 {
-	static vlasovius::kernels::wendland<2,6> W;
+	static vlasovius::kernels::wendland<2,4> W;
 
 	size_t dim { Y.n_cols };
 	vlasovius::geometry::kd_tree tree { Y };
@@ -110,9 +110,9 @@ arma::mat periodic_pou_interpolator<kernel>::operator()( const arma::mat &Y, siz
 	{
 		arma::mat my_result   ( Y.n_rows, nrhs, arma::fill::zeros );
 		arma::vec my_weightsum( Y.n_rows,       arma::fill::zeros );
-		arma::rowvec inv_sigma(dim), centre(dim);
-		arma::rowvec left_inv_sigma(dim), left_centre(dim);
-		arma::rowvec right_inv_sigma(dim), right_centre(dim);
+		arma::rowvec inv_sigma(dim), center(dim);
+		arma::rowvec left_inv_sigma(dim), left_center(dim);
+		arma::rowvec right_inv_sigma(dim), right_center(dim);
 
 		#pragma omp for schedule(dynamic)
 		for ( size_t i = 0; i < cover.n_rows; ++i )
@@ -141,7 +141,8 @@ arma::mat periodic_pou_interpolator<kernel>::operator()( const arma::mat &Y, siz
 			arma::mat Y_eval( Y.rows( arma::join_vert(idx, left_idx, right_idx) ) );
 			if(left_idx.n_rows > 0)
 			{
-				Y_eval.col(0).subvec(n_idx, n_idx + n_left_idx - 1) += L * arma::vec(n_left_idx, arma::fill::ones);
+				Y_eval.col(0).subvec(n_idx, n_idx + n_left_idx - 1)
+						+= L * arma::vec(n_left_idx, arma::fill::ones);
 			}
 			if(right_idx.n_rows > 0)
 			{
@@ -154,36 +155,36 @@ arma::mat periodic_pou_interpolator<kernel>::operator()( const arma::mat &Y, siz
 			for ( size_t d = 0; d < dim; ++d )
 			{
 				inv_sigma(d) = 1./((box(d+dim)-box(d))/2);
-				   centre(d) =     (box(d+dim)+box(d))/2;
+				   center(d) =     (box(d+dim)+box(d))/2;
 
 				left_inv_sigma(d) = inv_sigma(d);
-				   left_centre(d) =     (left_box(d+dim)+left_box(d))/2;
+				   left_center(d) =     (left_box(d+dim)+left_box(d))/2;
 
 				right_inv_sigma(d) = inv_sigma(d);
-				   right_centre(d) =     (right_box(d+dim)+right_box(d))/2;
+				   right_center(d) =     (right_box(d+dim)+right_box(d))/2;
 			}
 
 			arma::vec weights( n_idx + n_left_idx + n_right_idx );
 			for ( size_t j = 0; j < idx.size(); ++j )
 			{
-				weights(j) = W( std::abs(Y(idx(j),0)-centre(0))*inv_sigma(0) );
+				weights(j) = W( std::abs(Y(idx(j),0)-center(0))*inv_sigma(0) );
 				for ( size_t d = 1; d < dim; ++d )
-					weights(j) *= W( std::abs(Y(idx(j),d)-centre(d))*inv_sigma(d) );
+					weights(j) *= W( std::abs(Y(idx(j),d)-center(d))*inv_sigma(d) );
 			}
 			for( size_t j = n_idx; j < n_idx + n_left_idx; ++j)
 			{
-				weights(j) = W( std::abs(Y(left_idx(j - n_idx),0)-left_centre(0))*left_inv_sigma(0) );
+				weights(j) = W( std::abs(Y(left_idx(j - n_idx),0)-left_center(0))*left_inv_sigma(0) );
 				for ( size_t d = 1; d < dim; ++d )
 					weights(j) *= W( std::abs(Y(left_idx(j - n_idx),d)
-							- left_centre(d)) * left_inv_sigma(d) );
+							- left_center(d)) * left_inv_sigma(d) );
 			}
 			for( size_t j = n_idx + n_left_idx; j < n_idx + n_left_idx + n_right_idx; ++j)
 			{
 				weights(j) = W( std::abs(Y(right_idx(j - n_idx - n_left_idx),0)
-						- right_centre(0)) * right_inv_sigma(0) );
+						- right_center(0)) * right_inv_sigma(0) );
 				for ( size_t d = 1; d < dim; ++d )
 					weights(j) *= W( std::abs(Y(right_idx(j - n_idx - n_left_idx),d)
-							- right_centre(d)) * right_inv_sigma(d) );
+							- right_center(d)) * right_inv_sigma(d) );
 			}
 
 			my_result.rows(idx)    += weights % values;
