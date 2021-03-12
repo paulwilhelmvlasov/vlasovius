@@ -39,7 +39,7 @@ double maxwell(double x, double v, double alpha = 0.01, double k = 0.5)
 int main()
 {
 	constexpr size_t dim { 2 }, k { 4 };
-	constexpr size_t N { 1'000 };
+	constexpr size_t N { 5'000 };
 	constexpr double tikhonov_mu { 1e-17 };
 	constexpr size_t min_per_box = 200;
 	constexpr double enlarge = 1.5;
@@ -52,8 +52,8 @@ int main()
 	std::cout << "min per Box = " << min_per_box << std::endl;
 
 	using wendland_t     = vlasovius::kernels::wendland<dim,k>;
-	//using kernel_t       = vlasovius::kernels::rbf_kernel<wendland_t>;
-	using kernel_t = vlasovius::xv_kernel<4, 4>;
+	using kernel_t       = vlasovius::kernels::rbf_kernel<wendland_t>;
+	//using kernel_t = vlasovius::xv_kernel<4, 4>;
 	using interpolator_t = vlasovius::interpolators::periodic_pou_interpolator<kernel_t>;
 
 	arma::mat X( N, 2, arma::fill::randu );
@@ -68,8 +68,8 @@ int main()
 
 	arma::rowvec bounding_box { 0, -v_max, L, v_max };
 
-	//kernel_t K { wendland_t {}, 4.0 };
-	kernel_t K {4.0, 4.0, L};
+	kernel_t K { wendland_t {}, 6.0 };
+	//kernel_t K {4.0, 4.0, L};
 	vlasovius::misc::stopwatch clock;
 	interpolator_t sfx { K, X, f, bounding_box, enlarge, min_per_box, tikhonov_mu };
 	double elapsed { clock.elapsed() };

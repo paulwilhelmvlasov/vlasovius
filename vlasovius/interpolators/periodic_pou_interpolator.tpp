@@ -83,12 +83,13 @@ nrhs { f.n_cols }
 		arma::mat pt_mat = arma::join_vert(X.rows(idx), X.rows(left_idx), X.rows(right_idx));
 		if(n_left_idx > 0)
 		{
-			pt_mat.col(0).subvec(n_idx, n_idx + n_left_idx - 1) += L * arma::vec(n_left_idx, arma::fill::ones);
+			pt_mat.col(0).subvec(n_idx, n_idx + n_left_idx - 1)
+					+= L * arma::vec(n_left_idx, arma::fill::ones);
 		}
 		if(n_right_idx > 0)
 		{
 			pt_mat.col(0).subvec(n_idx + n_left_idx, n_idx + n_left_idx  + n_right_idx - 1)
-				-= L * arma::vec(n_right_idx, arma::fill::ones);
+					-= L * arma::vec(n_right_idx, arma::fill::ones);
 		}
 
 		arma::mat rhs =  arma::join_vert(f.rows(idx), f.rows(left_idx), f.rows(right_idx));
@@ -187,8 +188,8 @@ arma::mat periodic_pou_interpolator<kernel>::operator()( const arma::mat &Y, siz
 							- right_center(d)) * right_inv_sigma(d) );
 			}
 
-			my_result.rows(idx)    += weights % values;
-			my_weightsum.rows(idx) += weights;
+			my_result.rows(arma::join_vert(idx, left_idx, right_idx))    += weights % values;
+			my_weightsum.rows(arma::join_vert(idx, left_idx, right_idx)) += weights;
 		}
 
 		#pragma omp critical
