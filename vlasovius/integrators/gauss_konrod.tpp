@@ -36,7 +36,7 @@ template<typename function_1d_xv>
 	arma::uword N = x.n_rows;
 	arma::uword m_konrod = 15;
 	arma::uword m_gauss  = 7;
-	arma::mat z_eval_konrod(N * 15, 2);
+	arma::mat z_eval_konrod(N * m_konrod, 2);
 
 	#pragma omp parallel for num_threads(threads)
 	for(arma::uword i = 0; i < N; i++)
@@ -49,21 +49,21 @@ template<typename function_1d_xv>
 				+ 0.5 * (a + b) * arma::vec(m_konrod, arma::fill::ones);
 	}
 
+	// Now evaluate f at all Konrod-Points:
+	// (Note that the Gauss points are a subset.)
 	arma::vec f_eval = 0.5 * (b - a) * f(z_eval_konrod);
 
-	arma::mat f_eval_konrod(N, m_konrod);
-	arma::mat f_eval_gauss (N, m_gauss );
+	// ...and distribute the points to the evaluation matrices:
+	arma::mat f_eval_konrod(f_eval.memptr(), m_konrod, N);
+	f_eval_konrod = f_eval_konrod.t();
+	arma::mat f_eval_gauss = f_eval_konrod.submat(0, 0, N - 1, m_gauss - 1);
 
-	#pragma omp parallel for num_threads(threads)
-	for(arma::uword i = 0; i < N; i++)
-	{
-		f_eval_konrod.row(i) = f_eval.subvec(i * m_konrod, (i + 1) * m_konrod - 1).t();
-		f_eval_gauss.row(i)  = f_eval.subvec(i * m_konrod, i * m_konrod + m_gauss - 1 ).t();
-	}
-
+	// Compute integrals:
 	arma::vec int_konrod = f_eval_konrod * w_konrod_15;
 	arma::vec int_gauss  = f_eval_gauss * w_gauss_7;
 
+	// If the difference of konrod and gauss is smaller eps, then return konrod result.
+	// Else split the integral into two sub-integrals:
 	if(arma::norm(int_konrod - int_gauss, "inf") <= eps)
 	{
 		return int_konrod;

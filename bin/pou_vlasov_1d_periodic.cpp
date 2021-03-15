@@ -43,18 +43,18 @@ int main()
 	using wendland_t 	  = vlasovius::kernels::wendland<1,4>;
 	wendland_t W;
 
-	constexpr double tikhonov_mu { 1e-17 };
-	constexpr size_t min_per_box = 300;
-	constexpr double enlarge 	 = 1.5;
+	constexpr double tikhonov_mu { 1e-12 };
+	constexpr size_t min_per_box = 100;
+	constexpr double enlarge 	 = 1.2;
 
-	constexpr double v_max = 5.0;
+	constexpr double v_max = 6.0;
 
-	double L = 4*3.14159265358979323846, sigma  = 5.0;
+	double L = 4*3.14159265358979323846, sigma  = 6.0;
 	arma::rowvec bounding_box { 0, -v_max, L, v_max };
 
 	kernel_t K( {}, sigma );
 
-	size_t Nx = 50, Nv = 100;
+	size_t Nx = 100, Nv = 500;
 
 	size_t num_threads = omp_get_max_threads();
 
@@ -127,7 +127,7 @@ int main()
 			interpolator_t sfx { K, xv_stage, f, bounding_box, enlarge, min_per_box, tikhonov_mu };
 
 			arma::vec rho = vlasovius::integrators::num_rho_1d(sfx,
-					rho_points.col(0), v_max, 1e-8, num_threads);
+					rho_points.col(0), v_max, 1e-6, num_threads);
 
 			poisson.update_rho( rho );
 
