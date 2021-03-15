@@ -33,6 +33,19 @@
 #include <vlasovius/misc/periodic_poisson_1d.h>
 
 
+double lin_landau_f0(double x, double v, double alpha = 0.01, double k = 0.5)
+{
+	return 0.39894228040143267793994 * ( 1 + alpha * std::cos(k * x) )
+			* std::exp( -0.5 * v*v );
+}
+
+double two_stream_f0(double x, double v, double alpha = 0.01, double k = 0.5)
+{
+    return 0.39894228040143267793994 * v * v * std::exp(-0.5 * v * v )
+	        * (1.0 + alpha * std::cos(k * x));
+}
+
+
 int main()
 {
 	constexpr size_t order = 4;
@@ -54,7 +67,7 @@ int main()
 
 	kernel_t K( {}, sigma );
 
-	size_t Nx = 100, Nv = 500;
+	size_t Nx = 50, Nv = 200;
 
 	size_t num_threads = omp_get_max_threads();
 
@@ -94,7 +107,7 @@ int main()
 		xv( j + Nv*i, 1 ) = v;
 		constexpr double alpha = 0.01;
 		constexpr double k     = 0.5;
-		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) ) * std::exp( -v*v/2. );
+		f( j + Nv*i ) = two_stream_f0(x, v, alpha, k);
 	}
 
 	arma::mat plotX( 101*101, 2 );
