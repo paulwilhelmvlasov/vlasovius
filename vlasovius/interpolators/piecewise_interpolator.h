@@ -16,35 +16,38 @@
  * You should have received a copy of the GNU General Public License along with
  * vlasovius; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
+#ifndef VLASOVIUS_INTERPOLATORS_PIECEWISE_INTERPOLATOR_H
+#define VLASOVIUS_INTERPOLATORS_PIECEWISE_INTERPOLATOR_H
 
-#include <fstream>
-#include <iostream>
-
+#include <vector>
 #include <armadillo>
-#include <vlasovius/misc/stopwatch.h>
-#include <vlasovius/kernels/wendland.h>
+#include <vlasovius/interpolators/direct_interpolator.h>
 
-int main( int argc, char* argv[] )
+namespace vlasovius
 {
-	using vlasovius::misc::stopwatch;
 
+namespace interpolators
+{
 
-    size_t N = 3000;
-    constexpr size_t dim = 2, k = 4;
-    vlasovius::kernels::wendland<dim,k> W;
+template <typename kernel>
+class piecewise_interpolator
+{
+public:
+	piecewise_interpolator( kernel K, const arma::mat &X, const arma::mat &f,
+					        size_t min_per_box, double tikhonov_mu = 0, size_t num_threads = 1 );
 
-    arma::vec x( N+1 ), v(N+1);
-	for ( size_t i = 0; i <= N; ++i )
-		x(i) = -1.5 + (3.0/N)*i;
-	v = x;
+	arma::mat operator()( const arma::mat &Y, size_t num_threads = 1 ) const;
 
-	stopwatch clock;
-	v = W( std::move(v) );
-	double elapsed = clock.elapsed();
-	std::cout << "Time for evaluating: " << elapsed << ".\n";
+//private:
+	arma::mat cover;
+	size_t nrhs;
+	std::vector< direct_interpolator<kernel> > local_interpolants;
+};
 
-	std::ofstream file( "test_wendland.txt" );
-	for ( size_t i = 0; i <= N; ++i )
-		file << x(i) << " " << v(i) << " " << W.integral(x(i)) << std::endl;
-	return 0;
 }
+
+}
+
+
+#include <vlasovius/interpolators/piecewise_interpolator.tpp>
+#endif

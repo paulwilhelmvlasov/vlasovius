@@ -39,12 +39,12 @@ public:
 
 	// Copies sometimes could make sense, when passing a kernel by value and
 	// not ‘by type’ or by reference.
-	wendland( const wendland&  ) = default;
-	wendland(       wendland&& ) = default;
+	wendland( const wendland&  ) noexcept = default;
+	wendland(       wendland&& ) noexcept = default;
 
 	// Assignment doesn't do anything
-	wendland& operator=( const wendland&  ) { return *this; }
-	wendland& operator=(       wendland&& ) { return *this; }
+	wendland& operator=( const wendland&  ) noexcept { return *this; }
+	wendland& operator=(       wendland&& ) noexcept { return *this; }
 
 
 	// The heart of the matter: evaluation.
@@ -55,11 +55,11 @@ public:
 	void eval( double *r, size_t n ) const noexcept;
 	void eval( simd_t  r[vecsize] )  const noexcept;
 
-	double integral() const noexcept;
+	double integral( double r = 1 ) const noexcept;
 
 private:
-	double  c [ (dim/2) + 3*k + 2 ];
-	double  integral_;
+	double  c    [ (dim/2) + 3*k + 2 ]; // Chebyshev-Coefficients of Wendland function.
+	double  c_int[ (dim/2) + 3*k + 3 ]; // Chebyshev-Coefficients of its integral.
 };
 
 }
