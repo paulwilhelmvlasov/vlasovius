@@ -124,23 +124,25 @@ namespace wendland_impl
 // least (dim/2) + 3*k + 2 elements. This "reverse" ordering is used, because in
 // Clenshaw's algorithm for evaluating the polynomial, the coefficients are
 // accessed in this order.
-void compute_coefficients( size_t dim, size_t k, double *result, double *integral )
+void compute_coefficients( size_t dim, size_t k, double *result, double *result_int )
 {
 	// Compute coeffcients in exact arithmetic.
 	std::vector<rational> c = monomial_coeffs(dim,k);
 
-	rational exact_integral { c[0] };
-	for ( size_t n = 1; n < c.size(); ++n )
-	{
-		exact_integral += c[n] / (n+1);
-	}
-	*integral = static_cast<double>(exact_integral);
+	// Coefficients of the integral.
+	std::vector<rational> c_int(c.size()+1);
+	for ( size_t i = 0; i < c.size(); ++i )
+		c_int[i+1] = rational(1,i+1)*c[i];
 
 	monomial2chebyshev(c);
+	monomial2chebyshev(c_int);
 
 	// Reverse order and convert to double.
 	for ( size_t i = c.size(); i-- > 0; )
 		*result++ = static_cast<double>(c[i]);
+
+	for ( size_t i = c_int.size(); i-- > 0; )
+		*result_int++ = static_cast<double>(c_int[i]);
 }
 
 }

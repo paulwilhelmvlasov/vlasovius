@@ -16,11 +16,12 @@
  * You should have received a copy of the GNU General Public License along with
  * vlasovius; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
-#ifndef VLASOVIUS_INTERPOLATORS_DIRECT_INTERPOLATOR_H
-#define VLASOVIUS_INTERPOLATORS_DIRECT_INTERPOLATOR_H
+#ifndef VLASOVIUS_INTERPOLATORS_PIECEWISE_INTERPOLATOR_H
+#define VLASOVIUS_INTERPOLATORS_PIECEWISE_INTERPOLATOR_H
 
 #include <vector>
 #include <armadillo>
+#include <vlasovius/interpolators/direct_interpolator.h>
 
 namespace vlasovius
 {
@@ -29,33 +30,24 @@ namespace interpolators
 {
 
 template <typename kernel>
-class direct_interpolator
+class piecewise_interpolator
 {
 public:
-	direct_interpolator() = default;
-	direct_interpolator( const direct_interpolator&  )  = default;
-	direct_interpolator(       direct_interpolator&&  ) = default;
+	piecewise_interpolator( kernel K, const arma::mat &X, const arma::mat &f,
+					        size_t min_per_box, double tikhonov_mu = 0, size_t num_threads = 1 );
 
-	direct_interpolator& operator=( const direct_interpolator&  ) = default;
-	direct_interpolator& operator=(       direct_interpolator&& ) = default;
+	arma::mat operator()( const arma::mat &Y, size_t num_threads = 1 ) const;
 
-	direct_interpolator( kernel K, arma::mat X, arma::mat b,
-			             double tikhonov_mu = 0, size_t threads = 1 );
-
-	arma::mat operator()( const arma::mat &Y, size_t threads = 1 ) const;
-	const arma::mat& coeffs() const noexcept { return coeff; }
-	const arma::mat& points() const noexcept { return X; }
-
-private:
-	kernel    K;
-	arma::mat X;
-	arma::mat coeff;
+//private:
+	arma::mat cover;
+	size_t nrhs;
+	std::vector< direct_interpolator<kernel> > local_interpolants;
 };
 
 }
 
 }
 
-#include <vlasovius/interpolators/direct_interpolator.tpp>
-#endif
 
+#include <vlasovius/interpolators/piecewise_interpolator.tpp>
+#endif

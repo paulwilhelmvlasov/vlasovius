@@ -45,6 +45,6 @@ int main( int argc, char* argv[] )
 
 	std::ofstream file( "test_wendland.txt" );
 	for ( size_t i = 0; i <= N; ++i )
-		file << x(i) << " " << v(i) << std::endl;
+		file << x(i) << " " << v(i) << " " << W.integral(x(i)) << std::endl;
 	return 0;
 }

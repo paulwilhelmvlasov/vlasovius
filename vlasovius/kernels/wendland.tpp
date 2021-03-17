@@ -26,14 +26,14 @@ namespace kernels
 namespace wendland_impl
 {
 
-void compute_coefficients( size_t dim, size_t k, double *result, double *integral );
+void compute_coefficients( size_t dim, size_t k, double *result, double *result_int );
 
 }
 
 template <size_t dim, size_t k, typename simd_t>
 wendland<dim,k,simd_t>::wendland()
 {
-	wendland_impl::compute_coefficients( dim, k, c, &integral_ );
+	wendland_impl::compute_coefficients( dim, k, c, c_int );
 }
 
 template <size_t dim, size_t k, typename simd_t>
@@ -149,13 +149,31 @@ void wendland<dim,k,simd_t>::eval( simd_t r[ vecsize ] ) const noexcept
 }
 
 /*!
- * \brief Computes the integral of the Wendland function over the positive reals.
- * \int_{0}^{\infty} W(r)\,{\mathrm dr} = \int_{0}^{1} W(r)\,{\mathrm d}r.
+ * \brief Computes the definite integral of the Wendland function from 0 to r.
+ * \int_{0}^{r} W(t)\,{\mathrm dt}
  */
 template <size_t dim, size_t k, typename simd_t> inline
-double wendland<dim,k,simd_t>::integral() const noexcept
+double wendland<dim,k,simd_t>::integral( double r ) const noexcept
 {
-	return integral_;
+	constexpr size_t N { (dim/2) + 3*k + 2 };
+
+	bool sign { r < 0.0 };
+	r = std::min(std::abs(r),1.0);
+
+	// Clenshaw's algorithm for evaluating Chebyshev expansions.
+	double f      { 4*r - 2  };
+	double z_prev { c_int[0] };
+	double z      { std::fma(f,c_int[0],c_int[1]) };
+	for ( size_t i = 2; i < N; ++i )
+	{
+		double tmp = std::fma(f,z,c_int[i]) - z_prev;
+		z_prev = z;
+		z      = tmp;
+	}
+
+	f = 0.5*f;
+	f = std::fma(f,z,c_int[N]) - z_prev;
+	return sign ? -f : f;
 }
 
 }
