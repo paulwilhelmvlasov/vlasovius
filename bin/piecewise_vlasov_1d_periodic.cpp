@@ -29,6 +29,26 @@
 #include <vlasovius/misc/periodic_poisson_1d.h>
 
 
+double lin_landau_f0(double x, double v, double alpha = 0.01, double k = 0.5)
+{
+	return 0.39894228040143267793994 * ( 1 + alpha * std::cos(k * x) )
+			* std::exp( -0.5 * v*v );
+}
+
+double two_stream_f0(double x, double v, double alpha = 0.01, double k = 0.5)
+{
+    return 0.39894228040143267793994 * v * v * std::exp(-0.5 * v * v )
+	        * (1.0 + alpha * std::cos(k * x));
+}
+
+double bump_on_tail_f0(double x, double v, double alpha = 0.01, double k = 0.5, double nb = 0.1, double vb = 4.5)
+{
+    return 0.39894228040143267793994 * ((1.0 - nb) * std::exp(-0.5 * v * v)
+        + nb * std::exp(-2.0 * (v - vb) * (v - vb)))
+        * (1.0 + alpha * std::cos(k * x));
+
+}
+
 constexpr size_t order = 1;
 using wendland_t       = vlasovius::kernels::wendland<1,order>;
 using kernel_t         = vlasovius::kernels::tensorised_kernel<wendland_t>;
@@ -37,18 +57,18 @@ using poisson_t        = vlasovius::misc::poisson_gedoens::periodic_poisson_1d<8
 
 int main()
 {
-	constexpr double tikhonov_mu { 0 };
+	constexpr double tikhonov_mu { 1e-12 };
 	constexpr size_t min_per_box = 200;
 
 	double L = 4*3.14159265358979323846;
 
 	wendland_t W;
-	arma::rowvec sigma { L/2, 5 };
+	arma::rowvec sigma { L/2., 5 };
 	kernel_t   K ( W, sigma );
 	kernel_t   Kx( W, arma::rowvec { sigma(0) } );
 
 
-	size_t Nx = 512, Nv = 1024;
+	size_t Nx = 1024, Nv = 2056;
 	std::cout << "Number of particles: " << Nx*Nv << ".\n";
 
 	size_t num_threads = omp_get_max_threads();
@@ -74,7 +94,7 @@ int main()
 		xv( j + Nv*i, 1 ) = v;
 		constexpr double alpha = 0.01;
 		constexpr double k     = 0.5;
-		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) ) * std::exp( -v*v/2. ) * v*v;
+		f( j + Nv*i ) = bump_on_tail_f0(x, v, alpha, k);
 	}
 
 	arma::mat plotX( 401*401, 2 );
@@ -88,7 +108,7 @@ int main()
 		}
 
 	size_t count = 0;
-	double t = 0, T = 100, dt = 1./16.;
+	double t = 0, T = 200, dt = 1./8.;
 	std::ofstream str("E.txt");
 	while ( t < T )
 	{
