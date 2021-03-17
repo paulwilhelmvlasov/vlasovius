@@ -29,7 +29,7 @@
 #include <vlasovius/misc/periodic_poisson_1d.h>
 
 
-constexpr size_t order = 6;
+constexpr size_t order = 1;
 using wendland_t       = vlasovius::kernels::wendland<1,order>;
 using kernel_t         = vlasovius::kernels::tensorised_kernel<wendland_t>;
 using interpolator_t   = vlasovius::interpolators::piecewise_interpolator<kernel_t>;
@@ -37,30 +37,26 @@ using poisson_t        = vlasovius::misc::poisson_gedoens::periodic_poisson_1d<8
 
 int main()
 {
-	constexpr double tikhonov_mu { 1e-12 };
+	constexpr double tikhonov_mu { 0 };
 	constexpr size_t min_per_box = 200;
 
 	double L = 4*3.14159265358979323846;
-	arma::rowvec sigma { 3 , 3 };
+
 	wendland_t W;
+	arma::rowvec sigma { L/2, 5 };
 	kernel_t   K ( W, sigma );
 	kernel_t   Kx( W, arma::rowvec { sigma(0) } );
-	size_t Nx = 200, Nv = 1000;
+
+
+	size_t Nx = 512, Nv = 1024;
+	std::cout << "Number of particles: " << Nx*Nv << ".\n";
 
 	size_t num_threads = omp_get_max_threads();
 
-	// Runge--Kutta Butcher tableau.
-	constexpr double c_rk4[4][4] = { {   0,   0,  0, 0 },
-	                                 { 0.5,   0,  0, 0 },
-	                                 {   0, 0.5,  0, 0 },
-	                                 {   0,   0,  1, 0 } };
-	constexpr double d_rk4[4] = { 1./6., 1./3., 1./3., 1./6. };
-
-
-	arma::mat xv, k_xv[ 4 ];
+	arma::mat xv;
 	arma::vec f;
 
-	poisson_t poisson(0,L,512);
+	poisson_t poisson(0,L,256);
 	arma::vec rho_points = poisson.quadrature_nodes();
 	arma::vec rho( rho_points.size() );
 	vlasovius::geometry::kd_tree rho_tree(rho_points);
@@ -72,39 +68,41 @@ int main()
 	for ( size_t j = 0; j < Nv; ++j )
 	{
 		double x = i * (L/Nx);
-		double v = -6 + j*(12./(Nv-1));
+		double v = -5 + j*(10./(Nv-1));
 
 		xv( j + Nv*i, 0 ) = x;
 		xv( j + Nv*i, 1 ) = v;
 		constexpr double alpha = 0.01;
 		constexpr double k     = 0.5;
-		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) ) * std::exp( -v*v/2. );
+		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) ) * std::exp( -v*v/2. ) * v*v;
 	}
 
-	double t = 0, T = 100, dt = 1./8.;
+	arma::mat plotX( 401*401, 2 );
+	arma::vec plotf( 401*401 );
+	for ( size_t i = 0; i <= 400; ++i )
+		for ( size_t j = 0; j <= 400; ++j )
+		{
+			plotX(j + 401*i,0) = L * i/400.;
+			plotX(j + 401*i,1) = 8.0 * j/400. - 4.0;
+			plotf(j + 401*i) = 0;
+		}
+
+	size_t count = 0;
+	double t = 0, T = 100, dt = 1./16.;
 	std::ofstream str("E.txt");
 	while ( t < T )
 	{
 		std::cout << "t = " << t << ". " << std::endl;
 		vlasovius::misc::stopwatch clock;
-		for ( size_t stage = 0; stage < 4; ++stage )
+
+		if ( t + dt > T ) dt = T - t;
+
+		xv.col(0) += dt*xv.col(1);             // Move particles
+		xv.col(0) -= L * floor(xv.col(0) / L); // Set to periodic positions.
+		interpolator_t sfx { K, xv, f, min_per_box, tikhonov_mu, num_threads };
+		rho.fill(1);
+		#pragma omp parallel
 		{
-			arma::mat xv_stage = xv;
-			for ( size_t s = 0;  s+1 <= stage; ++s )
-				xv_stage += dt*c_rk4[stage][s]*k_xv[s];
-
-			k_xv[ stage ].resize( xv.n_rows, xv.n_cols );
-			k_xv[ stage ].col(0) = xv_stage.col(1);
-
-			xv_stage.col(0) -= L * floor(xv_stage.col(0) / L);
-
-			interpolator_t sfx { K, xv_stage, f, min_per_box, tikhonov_mu, num_threads };
-
-
-			rho.fill(1);
-			#pragma omp parallel
-			{
-
 			arma::vec my_rho(rho.size(),arma::fill::zeros);
 			#pragma omp for schedule(dynamic)
 			for ( size_t i = 0; i < sfx.cover.n_rows; ++i )
@@ -129,27 +127,38 @@ int main()
 
 			#pragma omp critical
 			rho -= my_rho;
-			}
+		}
 
-			poisson.update_rho( rho );
-			for ( size_t i = 0; i < xv_stage.n_rows; ++i )
-				k_xv[stage](i,1) = -poisson.E( xv_stage(i,0) );
+		poisson.update_rho( rho ); double max_e = 0;
+		for ( size_t i = 0; i < xv.n_rows; ++i )
+		{
+			double E = poisson.E(xv(i,0));
+			xv(i,1) += -dt*E;
+			max_e = std::max(max_e,std::abs(E));
+		}
+		str << t << " " << max_e  << std::endl;
+		std::cout << "Max-norm of E: " << max_e << "." << std::endl;
 
-			if ( stage == 0 )
+		plotf = sfx(plotX);
+		if ( count++ % 16 == 0 )
+		{
+		std::ofstream fstr( "f_" + std::to_string(t) + ".txt" );
+		for ( size_t i = 0; i <= 400; ++i )
+		{
+			for ( size_t j = 0; j <= 400; ++j )
 			{
-				str << t << " " << norm(k_xv[stage].col(1),"inf")  << std::endl;
-				std::cout << "Max-norm of E: " << norm(k_xv[stage].col(1),"inf") << "." << std::endl;
+				fstr << plotX(j + 401*i,0) << " " << plotX(j + 401*i,1)
+				     << " " << plotf(j+401*i) << std::endl;
 			}
- 		}
+			fstr << "\n";
+		}
 
-		for ( size_t s = 0; s < 4; ++s )
-			xv += dt*d_rk4[s]*k_xv[s];
-		t += dt;
+		}
 
 		double elapsed = clock.elapsed();
 		std::cout << "Time for needed for time-step: " << elapsed << ".\n";
 		std::cout << "---------------------------------------\n";
 
-		if ( t + dt > T ) dt = T - t;
+		t += dt;
 	}
 }

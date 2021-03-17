@@ -43,7 +43,8 @@ public:
 			             double tikhonov_mu = 0, size_t threads = 1 );
 
 	arma::mat operator()( const arma::mat &Y, size_t threads = 1 ) const;
-	arma::mat coeffs() const { return coeff; }
+	const arma::mat& coeffs() const noexcept { return coeff; }
+	const arma::mat& points() const noexcept { return X; }
 
 private:
 	kernel    K;
