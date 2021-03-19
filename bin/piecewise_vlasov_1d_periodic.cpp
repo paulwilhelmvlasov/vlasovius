@@ -57,7 +57,7 @@ using poisson_t        = vlasovius::misc::poisson_gedoens::periodic_poisson_1d<8
 
 int main()
 {
-	constexpr double tikhonov_mu { 1e-12 };
+	constexpr double tikhonov_mu { 1e-10 };
 	constexpr size_t min_per_box = 200;
 
 	double L = 4*3.14159265358979323846;
@@ -68,8 +68,10 @@ int main()
 	kernel_t   Kx( W, arma::rowvec { sigma(0) } );
 
 
-	size_t Nx = 1024, Nv = 2056;
+	size_t Nx = 256, Nv = 1024;
 	std::cout << "Number of particles: " << Nx*Nv << ".\n";
+
+	double v_max = 10;
 
 	size_t num_threads = omp_get_max_threads();
 
@@ -88,27 +90,27 @@ int main()
 	for ( size_t j = 0; j < Nv; ++j )
 	{
 		double x = i * (L/Nx);
-		double v = -5 + j*(10./(Nv-1));
+		double v = -v_max + j*(2*v_max/(Nv-1));
 
 		xv( j + Nv*i, 0 ) = x;
 		xv( j + Nv*i, 1 ) = v;
 		constexpr double alpha = 0.01;
 		constexpr double k     = 0.5;
-		f( j + Nv*i ) = bump_on_tail_f0(x, v, alpha, k);
+		f( j + Nv*i ) = bump_on_tail_f0(x, v, alpha, k, 0.3, 4.5);
 	}
 
-	arma::mat plotX( 401*401, 2 );
-	arma::vec plotf( 401*401 );
-	for ( size_t i = 0; i <= 400; ++i )
-		for ( size_t j = 0; j <= 400; ++j )
+	arma::mat plotX( 201*201, 2 );
+	arma::vec plotf( 201*201 );
+	for ( size_t i = 0; i <= 200; ++i )
+		for ( size_t j = 0; j <= 200; ++j )
 		{
-			plotX(j + 401*i,0) = L * i/400.;
-			plotX(j + 401*i,1) = 8.0 * j/400. - 4.0;
-			plotf(j + 401*i) = 0;
+			plotX(j + 201*i,0) = L * i/200.;
+			plotX(j + 201*i,1) = 2*v_max * j/200. - v_max;
+			plotf(j + 201*i) = 0;
 		}
 
 	size_t count = 0;
-	double t = 0, T = 200, dt = 1./8.;
+	double t = 0, T = 50, dt = 1./16.;
 	std::ofstream str("E.txt");
 	while ( t < T )
 	{
@@ -163,12 +165,12 @@ int main()
 		if ( count++ % 16 == 0 )
 		{
 		std::ofstream fstr( "f_" + std::to_string(t) + ".txt" );
-		for ( size_t i = 0; i <= 400; ++i )
+		for ( size_t i = 0; i <= 200; ++i )
 		{
-			for ( size_t j = 0; j <= 400; ++j )
+			for ( size_t j = 0; j <= 200; ++j )
 			{
-				fstr << plotX(j + 401*i,0) << " " << plotX(j + 401*i,1)
-				     << " " << plotf(j+401*i) << std::endl;
+				fstr << plotX(j + 201*i,0) << " " << plotX(j + 201*i,1)
+				     << " " << plotf(j+201*i) << std::endl;
 			}
 			fstr << "\n";
 		}
