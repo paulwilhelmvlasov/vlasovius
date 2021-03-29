@@ -28,6 +28,63 @@ namespace wendland_impl
 
 void compute_coefficients( size_t dim, size_t k, double *result, double *result_int );
 
+template <size_t N>
+double clenshaw( const double c[N], double x )
+{
+	// Clenshaw's algorithm for evaluating Chebyshev expansions.
+	double f      { 4*x - 2 };
+	double z_prev { c[0] };
+	double z      { std::fma(f,c[0],c[1]) };
+	for ( size_t i = 2; i < N-1; ++i )
+	{
+		double tmp = std::fma(f,z,c[i]) - z_prev;
+		z_prev = z;
+		z      = tmp;
+	}
+	f = 0.5*f;
+	return std::fma(f,z,c[N-1]) - z_prev;
+}
+
+template <size_t N, size_t M, typename simd_t>
+void clenshaw_simd( const double c[N], simd_t x[M] ) noexcept
+{
+	// Clenshaw's algorithm for evaluating Chebyshev expansions,
+	// vectorised SIMD version.
+	simd_t tmp, c_tmp, z[ M ], z_prev[ M ];
+
+	tmp.fill(1.0);
+	for ( size_t m = 0; m < M; ++m )
+	{
+		x[m] = x[m] + x[m] - tmp;
+		x[m] = x[m] + x[m];
+	}
+
+	tmp.fill(c[0]); c_tmp.fill(c[1]);
+	for ( size_t m = 0; m < M; ++m )
+	{
+		z_prev[m] = tmp;
+		z[m] = fmadd(x[m],tmp,c_tmp);
+	}
+
+	for ( size_t n = 2; n < N-1; ++n )
+	{
+		c_tmp.fill(c[n]);
+		for ( size_t m = 0; m < M; ++m )
+		{
+			tmp = fmadd(x[m],z[m],c_tmp)-z_prev[m];
+			z_prev[m] = z[m];
+			z[m]      = tmp;
+		}
+	}
+
+	tmp.fill(0.5); c_tmp.fill(c[N-1]);
+	for ( size_t m = 0; m < M; ++m )
+	{
+		x[m] = tmp*x[m];
+		x[m] = fmadd(x[m],z[m],c_tmp) - z_prev[m];
+	}
+}
+
 }
 
 template <size_t dim, size_t k, typename simd_t>
@@ -43,20 +100,7 @@ double wendland<dim,k,simd_t>::operator()( double r ) const noexcept
 
 	r = std::abs(r);
 	if ( r >= 1 ) return 0;
-
-	// Clenshaw's algorithm for evaluating Chebyshev expansions.
-	double f      { 4*r - 2 };
-	double z_prev { c[0] };
-	double z      { std::fma(f,c[0],c[1]) };
-	for ( size_t i = 2; i < N-1; ++i )
-	{
-		double tmp = std::fma(f,z,c[i]) - z_prev;
-		z_prev = z;
-		z      = tmp;
-	}
-
-	f = 0.5*f;
-	return std::fma(f,z,c[N-1]) - z_prev;
+	else return wendland_impl::clenshaw<N>(c,r);
 }
 
 template <size_t dim, size_t k, typename simd_t>
@@ -65,18 +109,9 @@ simd_t wendland<dim,k,simd_t>::operator()( simd_t r ) const noexcept
 	constexpr size_t N { (dim/2) + 3*k + 2 };
 
 	r = abs(r);
-	r = r + r - 1.0; r = r + r;
-	simd_t z_prev { c[0] }, z { fmadd(r,c[0],c[1]) };
-	for ( size_t i = 2; i < N-1; ++i )
-	{
-		simd_t tmp = fmadd(r,z,c[i])-z_prev;
-		z_prev = z;
-		z      = tmp;
-	}
-	r = 0.5*r;
-	z = (fmadd(r,z,c[N-1]) - z_prev) & less_than(r,1.0);
-
-	return z;
+	simd_t mask = less_than(r,simd_t(1.0));
+	wendland_impl::clenshaw_simd<N,1,simd_t>(c,&r);
+	return r & mask;
 }
 
 template <size_t dim, size_t k, typename simd_t>
@@ -110,42 +145,20 @@ template <size_t dim, size_t k, typename simd_t>
 void wendland<dim,k,simd_t>::eval( simd_t r[ vecsize ] ) const noexcept
 {
 	constexpr size_t N { (dim/2) + 3*k + 2 };
-	simd_t tmp, c_tmp, z[ vecsize ], z_prev[ vecsize ];
 
-	tmp.fill(1.0);
-	for ( size_t l = 0; l < vecsize; ++l )
+	simd_t mask[ vecsize ]; simd_t ones { 1.0 };
+	for ( size_t m = 0; m < vecsize; ++m )
 	{
-		r[l] = abs(r[l]);
-		r[l] = r[l] + r[l] - tmp;
-		r[l] = r[l] + r[l];
+		r   [m] = abs(r[m]);
+		mask[m] = less_than( r[m], ones );
 	}
 
-	tmp.fill(c[0]); c_tmp.fill(c[1]);
-	for ( size_t l = 0; l < vecsize; ++l )
+	wendland_impl::clenshaw_simd<N,vecsize,simd_t>(c,r);
+
+	for ( size_t m = 0; m < vecsize; ++m )
 	{
-		z_prev[l] = tmp;
-		z[l] = fmadd(r[l],tmp,c_tmp);
+		r[m] = r[m] & mask[m];
 	}
-
-	for ( size_t i = 2; i < N-1; ++i )
-	{
-		c_tmp.fill(c[i]);
-		for ( size_t l = 0; l < vecsize; ++l )
-		{
-			tmp = fmadd(r[l],z[l],c_tmp)-z_prev[l];
-			z_prev[l] = z[l];
-			z[l]      = tmp;
-		}
-	}
-
-	tmp.fill(0.5);
-	for ( size_t l = 0; l < vecsize; ++l ) r[l] = tmp*r[l];
-
-	c_tmp.fill(c[N-1]);
-	for ( size_t l = 0; l < vecsize; ++l ) z[l] = fmadd(r[l],z[l],c_tmp) - z_prev[l];
-
-	tmp.fill(1.0);
-	for ( size_t l = 0; l < vecsize; ++l ) r[l] = z[l] & less_than(r[l],tmp);
 }
 
 /*!
@@ -159,21 +172,8 @@ double wendland<dim,k,simd_t>::integral( double r ) const noexcept
 
 	bool sign { r < 0.0 };
 	r = std::min(std::abs(r),1.0);
-
-	// Clenshaw's algorithm for evaluating Chebyshev expansions.
-	double f      { 4*r - 2  };
-	double z_prev { c_int[0] };
-	double z      { std::fma(f,c_int[0],c_int[1]) };
-	for ( size_t i = 2; i < N; ++i )
-	{
-		double tmp = std::fma(f,z,c_int[i]) - z_prev;
-		z_prev = z;
-		z      = tmp;
-	}
-
-	f = 0.5*f;
-	f = std::fma(f,z,c_int[N]) - z_prev;
-	return sign ? -f : f;
+	r = wendland_impl::clenshaw<N+1>( c_int, r );
+	return sign ? -r : r;
 }
 
 }

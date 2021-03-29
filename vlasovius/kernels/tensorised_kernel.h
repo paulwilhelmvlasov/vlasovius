@@ -53,6 +53,17 @@ public:
 			   const double *C, size_t ldC, size_t num_threads = 1 ) const;
 
 private:
+	void eval_column( size_t dim, size_t n, size_t j,
+			                double *K, size_t ldK,
+	                  const double *X, size_t ldX,
+	                  const double *Y, size_t ldY ) const;
+
+	template <typename simd_t>
+	void micro_kernel( size_t dim, simd_t mat[ simd_t::size() ],
+			           const double *X, size_t ldX,
+	                   const double *Y, size_t ldY ) const;
+
+private:
 	rbf_function F         {};
 	arma::rowvec inv_sigma {1};
 };
