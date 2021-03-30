@@ -29,6 +29,27 @@
 #include <vlasovius/interpolators/pou_interpolator.h>
 #include <vlasovius/misc/periodic_poisson_1d.h>
 
+
+double lin_landau_f0(double x, double v, double alpha = 0.01, double k = 0.5)
+{
+	return 0.39894228040143267793994 * ( 1 + alpha * std::cos(k * x) )
+			* std::exp( -0.5 * v*v );
+}
+
+double two_stream_f0(double x, double v, double alpha = 0.01, double k = 0.5)
+{
+    return 0.39894228040143267793994 * v * v * std::exp(-0.5 * v * v )
+	        * (1.0 + alpha * std::cos(k * x));
+}
+
+double bump_on_tail_f0(double x, double v, double alpha = 0.01, double k = 0.5, double nb = 0.1, double vb = 4.5)
+{
+    return 0.39894228040143267793994 * ((1.0 - nb) * std::exp(-0.5 * v * v)
+        + nb * std::exp(-0.5 * (v - vb) * (v - vb)))
+        * (1.0 + alpha * std::cos(k * x));
+
+}
+
 namespace vlasovius
 {
 
@@ -221,7 +242,9 @@ int main()
 	using wendland_t = vlasovius::kernels::wendland<1,4>;
 	wendland_t W;
 
-	double L = 4*3.14159265358979323846, sigma_x  = 3, sigma_v = 0.5;
+	double L = 4*3.14159265358979323846, sigma_x  = 2, sigma_v = 1;
+	double mu = 1e-12;
+	double v_max = 10;
 	kernel_t K( sigma_x, sigma_v, L );
 
 
@@ -251,23 +274,49 @@ int main()
 	}
 
 	// Initialise xv.
-	size_t Nx = 50, Nv = 100;
+	size_t Nx = 64, Nv = 128;
 	xv.set_size( Nx*Nv,2 );
 	f.resize( Nx*Nv );
 	for ( size_t i = 0; i < Nx; ++i )
 	for ( size_t j = 0; j < Nv; ++j )
 	{
 		double x = i * (L/Nx);
-		double v = -6 + j*(12./(Nv-1));
+		double v = -v_max + j*(2.0 * v_max/(Nv-1));
 
 		xv( j + Nv*i, 0 ) = x;
 		xv( j + Nv*i, 1 ) = v;
 		constexpr double alpha = 0.01;
 		constexpr double K     = 0.5;
-		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1 + alpha*std::cos(K*x) ) * std::exp( -v*v/2 );
+		f( j + Nv*i ) = two_stream_f0(x, v, alpha, K);
 	}
 
-	double t = 0, T = 100, dt = 1./4.;
+	arma::mat plotX( 201*201, 2 );
+	arma::vec plotf( 201*201 );
+	for ( size_t i = 0; i <= 200; ++i )
+		for ( size_t j = 0; j <= 200; ++j )
+		{
+			plotX(j + 201*i,0) = L * i/200.;
+			plotX(j + 201*i,1) = 2*v_max * j/200. - v_max;
+			plotf(j + 201*i) = 0;
+		}
+
+	// t == 0 plot:
+	interpolator_t sfx_plot( K, xv, f, mu, num_threads );
+	plotf = sfx_plot(plotX);
+	std::ofstream fstr( "f_" + std::to_string(0.0) + ".txt" );
+	for ( size_t i = 0; i <= 200; ++i )
+	{
+		for ( size_t j = 0; j <= 200; ++j )
+		{
+			fstr << plotX(j + 201*i,0) << " " << plotX(j + 201*i,1)
+				 << " " << plotf(j+201*i) << std::endl;
+		}
+		fstr << "\n";
+	}
+
+	size_t count = 0;
+	vlasovius::misc::stopwatch main_clock;
+	double t = 0, T = 30.25, dt = 1./4.;
 	std::ofstream str("E.txt");
 	while ( t < T )
 	{
@@ -282,7 +331,7 @@ int main()
 			k_xv[ stage ].resize( xv.n_rows, xv.n_cols );
 			k_xv[ stage ].col(0) = xv_stage.col(1);
 
-			interpolator_t sfx( K, xv_stage, f, 0, num_threads );
+			interpolator_t sfx( K, xv_stage, f, mu, num_threads );
 			arma::vec rho = arma::vec(rho_points.n_rows,arma::fill::ones) -
 					        2 * W.integral() * sigma_v * K.eval_x( rho_points, xv_stage ) * sfx.coeffs();
 			poisson.update_rho( rho );
@@ -305,6 +354,26 @@ int main()
 		std::cout << "Time for needed for time-step: " << elapsed << ".\n";
 		std::cout << "---------------------------------------" << elapsed << ".\n";
 
+		interpolator_t sfx_plot( K, xv, f, mu, num_threads );
+		plotf = sfx_plot(plotX);
+		if ( ++count % 8 == 0)
+		{
+			std::ofstream fstr( "f_" + std::to_string(t) + ".txt" );
+			for ( size_t i = 0; i <= 200; ++i )
+			{
+				for ( size_t j = 0; j <= 200; ++j )
+				{
+					fstr << plotX(j + 201*i,0) << " " << plotX(j + 201*i,1)
+						 << " " << plotf(j+201*i) << std::endl;
+				}
+				fstr << "\n";
+			}
+		}
+
 		if ( t + dt > T ) dt = T - t;
 	}
+
+	double main_elapsed = main_clock.elapsed();
+	std::cout << "Time for needed for simulation: " << main_elapsed << ".\n";
+
 }

@@ -44,7 +44,7 @@ double two_stream_f0(double x, double v, double alpha = 0.01, double k = 0.5)
 double bump_on_tail_f0(double x, double v, double alpha = 0.01, double k = 0.5, double nb = 0.1, double vb = 4.5)
 {
     return 0.39894228040143267793994 * ((1.0 - nb) * std::exp(-0.5 * v * v)
-        + nb * std::exp(-2.0 * (v - vb) * (v - vb)))
+        + nb * std::exp(-0.5 * (v - vb) * (v - vb)))
         * (1.0 + alpha * std::cos(k * x));
 
 }
@@ -57,18 +57,18 @@ using poisson_t        = vlasovius::misc::poisson_gedoens::periodic_poisson_1d<8
 
 int main()
 {
-	constexpr double tikhonov_mu { 1e-10 };
+	constexpr double tikhonov_mu { 1e-12 };
 	constexpr size_t min_per_box = 200;
 
 	double L = 4*3.14159265358979323846;
 
 	wendland_t W;
-	arma::rowvec sigma { L/2., 5 };
+	arma::rowvec sigma { 1.0, 0.5 };
 	kernel_t   K ( W, sigma );
 	kernel_t   Kx( W, arma::rowvec { sigma(0) } );
 
 
-	size_t Nx = 256, Nv = 1024;
+	size_t Nx = 128, Nv = 256;
 	std::cout << "Number of particles: " << Nx*Nv << ".\n";
 
 	double v_max = 10;
@@ -96,7 +96,7 @@ int main()
 		xv( j + Nv*i, 1 ) = v;
 		constexpr double alpha = 0.01;
 		constexpr double k     = 0.5;
-		f( j + Nv*i ) = bump_on_tail_f0(x, v, alpha, k, 0.3, 4.5);
+		f( j + Nv*i ) = two_stream_f0(x, v, alpha, k);
 	}
 
 	arma::mat plotX( 201*201, 2 );
@@ -109,6 +109,21 @@ int main()
 			plotf(j + 201*i) = 0;
 		}
 
+	// t == 0 plot:
+	interpolator_t sfx_plot{ K, xv, f, min_per_box, tikhonov_mu, num_threads };
+	plotf = sfx_plot(plotX);
+	std::ofstream fstr( "f_" + std::to_string(0.0) + ".txt" );
+	for ( size_t i = 0; i <= 200; ++i )
+	{
+		for ( size_t j = 0; j <= 200; ++j )
+		{
+			fstr << plotX(j + 201*i,0) << " " << plotX(j + 201*i,1)
+				 << " " << plotf(j+201*i) << std::endl;
+		}
+		fstr << "\n";
+	}
+
+	vlasovius::misc::stopwatch main_clock;
 	size_t count = 0;
 	double t = 0, T = 50, dt = 1./16.;
 	std::ofstream str("E.txt");
@@ -183,4 +198,7 @@ int main()
 
 		t += dt;
 	}
+
+	double main_elapsed = main_clock.elapsed();
+	std::cout << "Time for needed for simulation: " << main_elapsed << ".\n";
 }

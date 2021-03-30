@@ -57,17 +57,17 @@ int main()
 	wendland_t W;
 
 	constexpr double tikhonov_mu { 1e-12 };
-	constexpr size_t min_per_box = 100;
+	constexpr size_t min_per_box = 200;
 	constexpr double enlarge 	 = 1.2;
 
 	constexpr double v_max = 6.0;
 
-	double L = 4*3.14159265358979323846, sigma  = 6.0;
+	double L = 4*3.14159265358979323846, sigma  = 1.0;
 	arma::rowvec bounding_box { 0, -v_max, L, v_max };
 
 	kernel_t K( {}, sigma );
 
-	size_t Nx = 50, Nv = 200;
+	size_t Nx = 128, Nv = 256;
 
 	size_t num_threads = omp_get_max_threads();
 
@@ -110,17 +110,18 @@ int main()
 		f( j + Nv*i ) = two_stream_f0(x, v, alpha, k);
 	}
 
-	arma::mat plotX( 101*101, 2 );
-	arma::vec plotf( 101*101 );
-	for ( size_t i = 0; i <= 100; ++i )
-		for ( size_t j = 0; j <= 100; ++j )
+	arma::mat plotX( 201*201, 2 );
+	arma::vec plotf( 201*201 );
+	for ( size_t i = 0; i <= 200; ++i )
+		for ( size_t j = 0; j <= 200; ++j )
 		{
-			plotX(j + 101*i,0) = L * i/100.;
-			plotX(j + 101*i,1) = 20.0 * j/100. - 10.0;
-			plotf(j + 101*i) = 0;
+			plotX(j + 201*i,0) = L * i/200.;
+			plotX(j + 201*i,1) = 2 * v_max * j/200. - v_max;
+			plotf(j + 201*i) = 0;
 		}
 
-	double t = 0, T = 100, dt = 1./4.;
+	size_t count = 0;
+	double t = 0, T = 50, dt = 1./8.;
 	std::ofstream str("E.txt");
 	while ( t < T )
 	{
@@ -147,19 +148,19 @@ int main()
 			for ( size_t i = 0; i < xv_stage.n_rows; ++i )
 				k_xv[stage](i,1) = -poisson.E( xv_stage(i,0) );
 
-			if ( stage == 0 )
+			if ( stage == 0  && count++ % 16 == 0)
 			{
 				str << t << " " << norm(k_xv[stage].col(1),"inf")  << std::endl;
 				std::cout << "Max-norm of E: " << norm(k_xv[stage].col(1),"inf") << "." << std::endl;
 
 				plotf = sfx(plotX);
 				std::ofstream str( "f_" + std::to_string(t) + "s.txt" );
-				for ( size_t i = 0; i <= 100; ++i )
+				for ( size_t i = 0; i <= 200; ++i )
 				{
-					for ( size_t j = 0; j <= 100; ++j )
+					for ( size_t j = 0; j <= 200; ++j )
 					{
-						str << plotX(j + 101*i,0) << " " << plotX(j + 101*i,1)
-								<< " " << plotf(j+101*i) << std::endl;
+						str << plotX(j + 201*i,0) << " " << plotX(j + 201*i,1)
+								<< " " << plotf(j+201*i) << std::endl;
 					}
 					str << "\n";
 				}
