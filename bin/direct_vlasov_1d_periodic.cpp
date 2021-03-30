@@ -24,7 +24,6 @@
 #include <vlasovius/misc/stopwatch.h>
 #include <vlasovius/kernels/wendland.h>
 #include <vlasovius/kernels/rbf_kernel.h>
-#include <vlasovius/kernels/periodised_kernel.h>
 #include <vlasovius/interpolators/direct_interpolator.h>
 #include <vlasovius/interpolators/pou_interpolator.h>
 #include <vlasovius/misc/periodic_poisson_1d.h>

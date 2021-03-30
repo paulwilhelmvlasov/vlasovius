@@ -48,7 +48,7 @@ int main()
 	kernel_t   Kx( W, arma::rowvec { sigma(0) } );
 
 
-	size_t Nx = 512, Nv = 1024;
+	size_t Nx = 512, Nv = 512;
 	std::cout << "Number of particles: " << Nx*Nv << ".\n";
 
 	size_t num_threads = omp_get_max_threads();
@@ -67,14 +67,14 @@ int main()
 	for ( size_t i = 0; i < Nx; ++i )
 	for ( size_t j = 0; j < Nv; ++j )
 	{
-		double x = i * (L/Nx);
+		double x = (i+0.5) * (L/Nx);
 		double v = -5 + j*(10./(Nv-1));
 
 		xv( j + Nv*i, 0 ) = x;
 		xv( j + Nv*i, 1 ) = v;
 		constexpr double alpha = 0.01;
 		constexpr double k     = 0.5;
-		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) ) * std::exp( -v*v/2. ) * v*v;
+		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) ) * std::exp( -v*v/2. );
 	}
 
 	arma::mat plotX( 401*401, 2 );
@@ -97,13 +97,33 @@ int main()
 
 		if ( t + dt > T ) dt = T - t;
 
+//		if ( count++ % 16 == 0 )
+//		{
+//			interpolator_t sfx { K, xv, f, min_per_box, tikhonov_mu, num_threads };
+//			plotf = sfx(plotX);
+//			std::ofstream fstr( "f_" + std::to_string(t) + ".txt" );
+//			for ( size_t i = 0; i <= 400; ++i )
+//			{
+//				for ( size_t j = 0; j <= 400; ++j )
+//				{
+//					fstr << plotX(j + 401*i,0) << " " << plotX(j + 401*i,1)
+//				    		 << " " << plotf(j+401*i) << std::endl;
+//				}
+//				fstr << "\n";
+//			}
+//		}
+
 		xv.col(0) += dt*xv.col(1);             // Move particles
 		xv.col(0) -= L * floor(xv.col(0) / L); // Set to periodic positions.
+
+
 		interpolator_t sfx { K, xv, f, min_per_box, tikhonov_mu, num_threads };
 		rho.fill(1);
 		#pragma omp parallel
 		{
 			arma::vec my_rho(rho.size(),arma::fill::zeros);
+			arma::vec coeff( 2*min_per_box );
+
 			#pragma omp for schedule(dynamic)
 			for ( size_t i = 0; i < sfx.cover.n_rows; ++i )
 			{
@@ -111,18 +131,22 @@ int main()
 				double x_min = sfx.cover(i,0), v_min = sfx.cover(i,1),
 				       x_max = sfx.cover(i,2), v_max = sfx.cover(i,3);
 
+				size_t n = local.points().n_rows;
 				const arma::mat &X = local.points();
-				arma::vec coeff = local.coeffs();
-				for ( size_t j = 0; j < coeff.size(); ++j )
+
+				if ( n > coeff.size() ) coeff.resize(n);
+
+				for ( size_t j = 0; j < n; ++j )
 				{
 					double v = X(j,1);
-					coeff(j) *= ( W.integral((v-v_min)/sigma(1)) +
-					              W.integral((v_max-v)/sigma(1)) )*sigma(1);
+					coeff(j) = local.coeffs()(j) * sigma(1) *
+							   ( W.integral((v-v_min)/sigma(1)) +
+					             W.integral((v_max-v)/sigma(1)) );
 				}
 
 				arma::rowvec box { x_min, x_max };
 				arma::uvec idx = rho_tree.index_query(box);
-				my_rho(idx) += Kx(rho_points(idx),X)*coeff;
+				my_rho(idx) += Kx(rho_points(idx),X)*coeff( arma::span(0,n-1) );
 			}
 
 			#pragma omp critical
@@ -139,21 +163,8 @@ int main()
 		str << t << " " << max_e  << std::endl;
 		std::cout << "Max-norm of E: " << max_e << "." << std::endl;
 
-		plotf = sfx(plotX);
-		if ( count++ % 16 == 0 )
-		{
-		std::ofstream fstr( "f_" + std::to_string(t) + ".txt" );
-		for ( size_t i = 0; i <= 400; ++i )
-		{
-			for ( size_t j = 0; j <= 400; ++j )
-			{
-				fstr << plotX(j + 401*i,0) << " " << plotX(j + 401*i,1)
-				     << " " << plotf(j+401*i) << std::endl;
-			}
-			fstr << "\n";
-		}
 
-		}
+
 
 		double elapsed = clock.elapsed();
 		std::cout << "Time for needed for time-step: " << elapsed << ".\n";
