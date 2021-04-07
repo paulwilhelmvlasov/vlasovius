@@ -1,0 +1,125 @@
+/*
+ * Copyright (C) 2021 Matthias Kirchhart and Paul Wilhelm
+ *
+ * This file is part of vlasovius.
+ *
+ * vlasovius is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 3, or (at your option) any later
+ * version.
+ *
+ * vlasovius is distributed in the hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+ * details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * vlasovius; see the file COPYING.  If not see http://www.gnu.org/licenses.
+ */
+
+#include <omp.h>
+#include <iostream>
+#include <armadillo>
+
+#include <vlasovius/misc/stopwatch.h>
+#include <vlasovius/kernels/wendland.h>
+#include <vlasovius/kernels/tensorised_kernel.h>
+#include <vlasovius/interpolators/piecewise_interpolator.h>
+#include <vlasovius/integrators/gauss_konrod.h>
+#include <vlasovius/misc/periodic_poisson_1d.h>
+
+double lin_landau_f0(double x, double v, double alpha = 0.01, double k = 0.5)
+{
+	return 0.39894228040143267793994 * ( 1 + alpha * std::cos(k * x) )
+			* std::exp( -0.5 * v*v );
+}
+
+double two_stream_f0(double x, double v, double alpha = 0.01, double k = 0.5)
+{
+    return 0.39894228040143267793994 * v * v * std::exp(-0.5 * v * v )
+	        * (1.0 + alpha * std::cos(k * x));
+}
+
+double bump_on_tail_f0(double x, double v, double alpha = 0.01, double k = 0.5, double nb = 0.1, double vb = 4.5)
+{
+    return 0.39894228040143267793994
+    		* ( (1.0 - nb) * std::exp(-0.5 * v * v)
+    				+ 2.0 * nb * std::exp(-2 * (v - vb) * (v - vb)) )
+        * (1.0 + alpha * std::cos(k * x));
+}
+
+struct resolution
+{
+	size_t Nx;
+	size_t Nv;
+};
+
+constexpr size_t order = 2;
+using wendland_t       = vlasovius::kernels::wendland<1,order>;
+using kernel_t         = vlasovius::kernels::tensorised_kernel<wendland_t>;
+using interpolator_t   = vlasovius::interpolators::piecewise_interpolator<kernel_t>;
+using poisson_t        = vlasovius::misc::poisson_gedoens::periodic_poisson_1d<8>;
+
+int main()
+{
+	constexpr double tikhonov_mu { 1e-10 };
+	constexpr size_t min_per_box = 200;
+
+	double L = 4*3.14159265358979323846;
+
+	wendland_t W;
+	arma::rowvec sigma { 6.0, 3.0 };
+	kernel_t   K ( W, sigma );
+	kernel_t   Kx( W, arma::rowvec { sigma(0) } );
+
+	double v_max = 10;
+
+	size_t num_threads = omp_get_max_threads();
+
+	resolution test_res {1024, 4096};
+
+	std::vector<resolution> res
+	{
+		{32, 64}, {48, 96}, {64, 128}, {128, 256}, {256, 1024}
+	};
+
+	std::vector<arma::mat> xv;
+	std::vector<arma::vec> f;
+
+	for(size_t r = 0; r < res.size(); r++)
+	{
+		arma::uword Nx = res[r].Nx;
+		arma::uword Nv = res[r].Nv;
+		xv[r].set_size( Nx*Nv,2 );
+		f[r].resize( Nx*Nv );
+		for ( size_t i = 0; i < Nx; ++i )
+			for ( size_t j = 0; j < Nv; ++j )
+			{
+				double x = i * (L/Nx);
+				double v = -v_max + j*(2*v_max/(Nv-1));
+
+				xv[r]( j + Nv*i, 0 ) = x;
+				xv[r]( j + Nv*i, 1 ) = v;
+				constexpr double alpha = 0.01;
+				constexpr double k     = 0.5;
+				f[r]( j + Nv*i ) = lin_landau_f0(x, v, alpha, k, 0.3, 4.5);
+			}
+	}
+
+	poisson_t poisson(0,L,256);
+	arma::vec rho_points = poisson.quadrature_nodes();
+	arma::vec rho( rho_points.size() );
+	vlasovius::geometry::kd_tree rho_tree(rho_points);
+
+	size_t count = 0;
+	double t = 0, T = 50.25, dt = 1./16.;
+	while ( t < T )
+	{
+		std::cout << "t = " << t << ". " << std::endl;
+
+		if ( t + dt > T ) dt = T - t;
+
+		// Hier weitermachen...
+	}
+
+}
