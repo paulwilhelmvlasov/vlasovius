@@ -28,6 +28,10 @@
 #include <vlasovius/integrators/gauss_konrod.h>
 #include <vlasovius/misc/periodic_poisson_1d.h>
 
+double maxwellian(double v)
+{
+	return 0.39894228040143267793994 * std::exp(-0.5 * v * v);
+}
 
 double lin_landau_f0(double x, double v, double alpha = 0.01, double k = 0.5)
 {
@@ -43,13 +47,14 @@ double two_stream_f0(double x, double v, double alpha = 0.01, double k = 0.5)
 
 double bump_on_tail_f0(double x, double v, double alpha = 0.01, double k = 0.5, double nb = 0.1, double vb = 4.5)
 {
-    return 0.39894228040143267793994 * ((1.0 - nb) * std::exp(-0.5 * v * v)
-        + nb * std::exp(-0.5 * (v - vb) * (v - vb)))
+    return 0.39894228040143267793994
+    		* ( (1.0 - nb) * std::exp(-0.5 * v * v)
+    				+ 2.0 * nb * std::exp(-2 * (v - vb) * (v - vb)) )
         * (1.0 + alpha * std::cos(k * x));
 
 }
 
-constexpr size_t order = 1;
+constexpr size_t order = 4;
 using wendland_t       = vlasovius::kernels::wendland<1,order>;
 using kernel_t         = vlasovius::kernels::tensorised_kernel<wendland_t>;
 using interpolator_t   = vlasovius::interpolators::piecewise_interpolator<kernel_t>;
@@ -57,18 +62,19 @@ using poisson_t        = vlasovius::misc::poisson_gedoens::periodic_poisson_1d<8
 
 int main()
 {
-	constexpr double tikhonov_mu { 1e-12 };
+	constexpr double tikhonov_mu { 1e-10 };
 	constexpr size_t min_per_box = 200;
 
 	double L = 4*3.14159265358979323846;
 
 	wendland_t W;
-	arma::rowvec sigma { 1.0, 0.5 };
+	arma::rowvec sigma { 6.0, 3.0 };
 	kernel_t   K ( W, sigma );
 	kernel_t   Kx( W, arma::rowvec { sigma(0) } );
 
+	size_t res_n = 400;
 
-	size_t Nx = 128, Nv = 256;
+	size_t Nx = 128, Nv = 512;
 	std::cout << "Number of particles: " << Nx*Nv << ".\n";
 
 	double v_max = 10;
@@ -96,36 +102,22 @@ int main()
 		xv( j + Nv*i, 1 ) = v;
 		constexpr double alpha = 0.01;
 		constexpr double k     = 0.5;
-		f( j + Nv*i ) = two_stream_f0(x, v, alpha, k);
+		f( j + Nv*i ) = bump_on_tail_f0(x, v, alpha, k, 0.3, 4.5);
 	}
 
-	arma::mat plotX( 201*201, 2 );
-	arma::vec plotf( 201*201 );
-	for ( size_t i = 0; i <= 200; ++i )
-		for ( size_t j = 0; j <= 200; ++j )
+	arma::mat plotX( (res_n + 1)*(res_n + 1), 2 );
+	arma::vec plotf( (res_n + 1)*(res_n + 1) );
+	for ( size_t i = 0; i <= res_n; ++i )
+		for ( size_t j = 0; j <= res_n; ++j )
 		{
-			plotX(j + 201*i,0) = L * i/200.;
-			plotX(j + 201*i,1) = 2*v_max * j/200. - v_max;
-			plotf(j + 201*i) = 0;
+			plotX(j + (res_n + 1)*i,0) = L * i/double(res_n);
+			plotX(j + (res_n + 1)*i,1) = 2*v_max * j/double(res_n) - v_max;
+			plotf(j + (res_n + 1)*i) = 0;
 		}
-
-	// t == 0 plot:
-	interpolator_t sfx_plot{ K, xv, f, min_per_box, tikhonov_mu, num_threads };
-	plotf = sfx_plot(plotX);
-	std::ofstream fstr( "f_" + std::to_string(0.0) + ".txt" );
-	for ( size_t i = 0; i <= 200; ++i )
-	{
-		for ( size_t j = 0; j <= 200; ++j )
-		{
-			fstr << plotX(j + 201*i,0) << " " << plotX(j + 201*i,1)
-				 << " " << plotf(j+201*i) << std::endl;
-		}
-		fstr << "\n";
-	}
 
 	vlasovius::misc::stopwatch main_clock;
 	size_t count = 0;
-	double t = 0, T = 50, dt = 1./16.;
+	double t = 0, T = 50.25, dt = 1./16.;
 	std::ofstream str("E.txt");
 	while ( t < T )
 	{
@@ -179,13 +171,21 @@ int main()
 		plotf = sfx(plotX);
 		if ( count++ % 16 == 0 )
 		{
-		std::ofstream fstr( "f_" + std::to_string(t) + ".txt" );
-		for ( size_t i = 0; i <= 200; ++i )
+		std::ofstream fstr( "f_" + std::to_string(t) + "s.txt" );
+		for ( size_t i = 0; i <= res_n; ++i )
 		{
-			for ( size_t j = 0; j <= 200; ++j )
+			for ( size_t j = 0; j <= res_n; ++j )
 			{
-				fstr << plotX(j + 201*i,0) << " " << plotX(j + 201*i,1)
-				     << " " << plotf(j+201*i) << std::endl;
+				arma::uword index = j + (res_n + 1)*i;
+				double x = plotX(index,0);
+				double v = plotX(index,1);
+				double f = plotf(index);
+				fstr << x << " " << v
+					 << " ";
+				if(f < 0)
+					fstr << 0 << std::endl;
+				else
+					fstr << f << std::endl;
 			}
 			fstr << "\n";
 		}

@@ -60,14 +60,14 @@ int main()
 	constexpr size_t min_per_box = 200;
 	constexpr double enlarge 	 = 1.2;
 
-	constexpr double v_max = 6.0;
+	constexpr double v_max = 10.0;
 
-	double L = 4*3.14159265358979323846, sigma  = 1.0;
+	double L = 4*3.14159265358979323846, sigma  = 2.0;
 	arma::rowvec bounding_box { 0, -v_max, L, v_max };
 
 	kernel_t K( {}, sigma );
 
-	size_t Nx = 128, Nv = 256;
+	size_t Nx = 64, Nv = 128;
 
 	size_t num_threads = omp_get_max_threads();
 
@@ -121,7 +121,7 @@ int main()
 		}
 
 	size_t count = 0;
-	double t = 0, T = 50, dt = 1./8.;
+	double t = 0, T = 50, dt = 1./4.;
 	std::ofstream str("E.txt");
 	while ( t < T )
 	{
@@ -148,7 +148,7 @@ int main()
 			for ( size_t i = 0; i < xv_stage.n_rows; ++i )
 				k_xv[stage](i,1) = -poisson.E( xv_stage(i,0) );
 
-			if ( stage == 0  && count++ % 16 == 0)
+			if ( stage == 0  && count++ % 4 == 0)
 			{
 				str << t << " " << norm(k_xv[stage].col(1),"inf")  << std::endl;
 				std::cout << "Max-norm of E: " << norm(k_xv[stage].col(1),"inf") << "." << std::endl;

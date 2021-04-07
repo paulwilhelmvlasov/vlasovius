@@ -29,6 +29,10 @@
 #include <vlasovius/interpolators/pou_interpolator.h>
 #include <vlasovius/misc/periodic_poisson_1d.h>
 
+double maxwellian(double v)
+{
+	return 0.39894228040143267793994 * std::exp(-0.5 * v * v);
+}
 
 double lin_landau_f0(double x, double v, double alpha = 0.01, double k = 0.5)
 {
@@ -234,15 +238,18 @@ void xv_kernel<k1,k2>::mul( size_t dim, size_t n, size_t m, size_t nrhs,
 
 int main()
 {
-	constexpr size_t order = 4;
-	using kernel_t        = vlasovius::xv_kernel<order,4>;
+	constexpr size_t order_x = 2;
+	constexpr size_t order_v = 2;
+	using kernel_t        = vlasovius::xv_kernel<order_x,order_v>;
 	using interpolator_t  = vlasovius::interpolators::direct_interpolator<kernel_t>;
 	using poisson_t       = vlasovius::misc::poisson_gedoens::periodic_poisson_1d<8>;
 
-	using wendland_t = vlasovius::kernels::wendland<1,4>;
+	using wendland_t = vlasovius::kernels::wendland<1,order_x>;
 	wendland_t W;
 
-	double L = 4*3.14159265358979323846, sigma_x  = 2, sigma_v = 1;
+	size_t res_n = 400;
+
+	double L = 4*3.14159265358979323846, sigma_x  = 1, sigma_v = 0.5;
 	double mu = 1e-12;
 	double v_max = 10;
 	kernel_t K( sigma_x, sigma_v, L );
@@ -274,7 +281,7 @@ int main()
 	}
 
 	// Initialise xv.
-	size_t Nx = 64, Nv = 128;
+	size_t Nx = 64, Nv = 256;
 	xv.set_size( Nx*Nv,2 );
 	f.resize( Nx*Nv );
 	for ( size_t i = 0; i < Nx; ++i )
@@ -290,33 +297,34 @@ int main()
 		f( j + Nv*i ) = two_stream_f0(x, v, alpha, K);
 	}
 
-	arma::mat plotX( 201*201, 2 );
-	arma::vec plotf( 201*201 );
-	for ( size_t i = 0; i <= 200; ++i )
-		for ( size_t j = 0; j <= 200; ++j )
+	arma::mat plotX( (res_n + 1)*(res_n + 1), 2 );
+	arma::vec plotf( (res_n + 1)*(res_n + 1) );
+	for ( size_t i = 0; i <= res_n; ++i )
+		for ( size_t j = 0; j <= res_n; ++j )
 		{
-			plotX(j + 201*i,0) = L * i/200.;
-			plotX(j + 201*i,1) = 2*v_max * j/200. - v_max;
-			plotf(j + 201*i) = 0;
+			plotX(j + (res_n + 1)*i,0) = L * i/double(res_n);
+			plotX(j + (res_n + 1)*i,1) = 2*v_max * j/double(res_n) - v_max;
+			plotf(j + (res_n + 1)*i) = 0;
 		}
 
 	// t == 0 plot:
 	interpolator_t sfx_plot( K, xv, f, mu, num_threads );
 	plotf = sfx_plot(plotX);
-	std::ofstream fstr( "f_" + std::to_string(0.0) + ".txt" );
-	for ( size_t i = 0; i <= 200; ++i )
-	{
-		for ( size_t j = 0; j <= 200; ++j )
+		std::ofstream fstr( "f_" + std::to_string(0.0) + "s.txt" );
+		for ( size_t i = 0; i <= res_n; ++i )
 		{
-			fstr << plotX(j + 201*i,0) << " " << plotX(j + 201*i,1)
-				 << " " << plotf(j+201*i) << std::endl;
+			for ( size_t j = 0; j <= res_n; ++j )
+			{
+				arma::uword index = j + (res_n + 1)*i;
+				fstr << plotX(index,0) << " " << plotX(index,1)
+					 << " " << plotf(index) << std::endl;
+			}
+			fstr << "\n";
 		}
-		fstr << "\n";
-	}
 
 	size_t count = 0;
 	vlasovius::misc::stopwatch main_clock;
-	double t = 0, T = 30.25, dt = 1./4.;
+	double t = 0, T = 60.25, dt = 1./2.;
 	std::ofstream str("E.txt");
 	while ( t < T )
 	{
@@ -331,9 +339,10 @@ int main()
 			k_xv[ stage ].resize( xv.n_rows, xv.n_cols );
 			k_xv[ stage ].col(0) = xv_stage.col(1);
 
-			interpolator_t sfx( K, xv_stage, f, mu, num_threads );
-			arma::vec rho = arma::vec(rho_points.n_rows,arma::fill::ones) -
-					        2 * W.integral() * sigma_v * K.eval_x( rho_points, xv_stage ) * sfx.coeffs();
+			arma::vec rhs = f - 0.39894228040143267793994 * exp(-0.5 * xv.col(1) % xv.col(1));
+			interpolator_t sfx( K, xv_stage, rhs, mu, num_threads );
+			arma::vec rho = //arma::vec(rho_points.n_rows,arma::fill::ones)
+					        - 2 * W.integral() * sigma_v * K.eval_x( rho_points, xv_stage ) * sfx.coeffs();
 			poisson.update_rho( rho );
 
 			for ( size_t i = 0; i < xv_stage.n_rows; ++i )
@@ -356,15 +365,22 @@ int main()
 
 		interpolator_t sfx_plot( K, xv, f, mu, num_threads );
 		plotf = sfx_plot(plotX);
-		if ( ++count % 8 == 0)
+		if ( ++count % 4 == 0)
 		{
 			std::ofstream fstr( "f_" + std::to_string(t) + ".txt" );
-			for ( size_t i = 0; i <= 200; ++i )
+			for ( size_t i = 0; i <= res_n; ++i )
 			{
-				for ( size_t j = 0; j <= 200; ++j )
+				for ( size_t j = 0; j <= res_n; ++j )
 				{
-					fstr << plotX(j + 201*i,0) << " " << plotX(j + 201*i,1)
-						 << " " << plotf(j+201*i) << std::endl;
+					arma::uword index = j + (res_n + 1)*i;
+					double x = plotX(index,0);
+					double v = plotX(index,1);
+					double f = plotf(index);
+					fstr << x << " " << v << " ";
+					if(f < 0)
+						fstr << 0 << std::endl;
+					else
+						fstr << f << std::endl;
 				}
 				fstr << "\n";
 			}
