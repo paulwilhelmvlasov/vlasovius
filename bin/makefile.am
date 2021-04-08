@@ -1,7 +1,7 @@
 noinst_PROGRAMS = test_wendland test_direct_interpolator test_pou_interpolator test_kd_tree \
                   direct_vlasov_1d_periodic test_gauss_konrod piecewise_vlasov_1d_periodic \
 		  moin \
-		 pou_vlasov_1d_periodic
+		 pou_vlasov_1d_periodic piecewise_convergence_test
 
 test_wendland_SOURCES = test_wendland.cpp
 test_wendland_LDADD = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp
@@ -29,4 +29,7 @@ moin_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp
 
 piecewise_vlasov_1d_periodic_SOURCES = piecewise_vlasov_1d_periodic.cpp
 piecewise_vlasov_1d_periodic_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp
+
+piecewise_convergence_test_SOURCES = piecewise_convergence_test.cpp
+piecewise_convergence_test_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp
 

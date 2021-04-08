@@ -80,13 +80,16 @@ int main()
 
 	std::vector<resolution> res
 	{
-		{32, 64}, {48, 96}, {64, 128}, {128, 256}, {256, 1024}
+		{32, 64}, {48, 96}, {64, 128}, {128, 256}, {256, 1024}, test_res
 	};
 
-	std::vector<arma::mat> xv;
-	std::vector<arma::vec> f;
+	arma::uword N_res_samples = res.size();
+	arma::uword test_N = 300;
 
-	for(size_t r = 0; r < res.size(); r++)
+	std::vector<arma::mat> xv(N_res_samples);
+	std::vector<arma::vec> f(N_res_samples);
+
+	for(size_t r = 0; r < N_res_samples; r++)
 	{
 		arma::uword Nx = res[r].Nx;
 		arma::uword Nv = res[r].Nv;
@@ -102,8 +105,14 @@ int main()
 				xv[r]( j + Nv*i, 1 ) = v;
 				constexpr double alpha = 0.01;
 				constexpr double k     = 0.5;
-				f[r]( j + Nv*i ) = lin_landau_f0(x, v, alpha, k, 0.3, 4.5);
+				f[r]( j + Nv*i ) = lin_landau_f0(x, v, alpha, k);
 			}
+	}
+
+	arma::vec x_test_pts(test_N);
+	for(size_t i = 0; i < test_N; i++)
+	{
+		x_test_pts(i) = i * (L / test_N);
 	}
 
 	poisson_t poisson(0,L,256);
@@ -112,14 +121,72 @@ int main()
 	vlasovius::geometry::kd_tree rho_tree(rho_points);
 
 	size_t count = 0;
-	double t = 0, T = 50.25, dt = 1./16.;
+	double t = 0, T = 30, dt = 1./16.;
+	std::ofstream str("E_infty_err.txt");
 	while ( t < T )
 	{
 		std::cout << "t = " << t << ". " << std::endl;
 
 		if ( t + dt > T ) dt = T - t;
 
-		// Hier weitermachen...
+		arma::mat E_values(test_N, N_res_samples);
+
+		for(size_t r = 0; r < N_res_samples; r++)
+		{
+			xv[r].col(0) += dt*xv[r].col(1);             // Move particles
+			xv[r].col(0) -= L * floor(xv[r].col(0) / L); // Set to periodic positions.
+			interpolator_t sfx { K, xv[r], f[r], min_per_box, tikhonov_mu, num_threads };
+			rho.fill(1);
+			#pragma omp parallel
+			{
+				arma::vec my_rho(rho.size(),arma::fill::zeros);
+				#pragma omp for schedule(dynamic)
+				for ( size_t i = 0; i < sfx.cover.n_rows; ++i )
+				{
+					const auto &local = sfx.local_interpolants[i];
+					double x_min = sfx.cover(i,0), v_min = sfx.cover(i,1),
+						   x_max = sfx.cover(i,2), v_max = sfx.cover(i,3);
+
+					const arma::mat &X = local.points();
+					arma::vec coeff = local.coeffs();
+					for ( size_t j = 0; j < coeff.size(); ++j )
+					{
+						double v = X(j,1);
+						coeff(j) *= ( W.integral((v-v_min)/sigma(1)) +
+						              W.integral((v_max-v)/sigma(1)) )*sigma(1);
+					}
+
+					arma::rowvec box { x_min, x_max };
+					arma::uvec idx = rho_tree.index_query(box);
+					my_rho(idx) += Kx(rho_points(idx),X)*coeff;
+				}
+
+				#pragma omp critical
+				rho -= my_rho;
+			}
+
+			poisson.update_rho( rho );
+			for ( size_t i = 0; i < xv[r].n_rows; ++i )
+			{
+				double E = poisson.E(xv[r](i,0));
+				xv[r](i,1) += -dt*E;
+			}
+
+			for(size_t i = 0; i < test_N; i++)
+			{
+				E_values(i, r) = poisson.E(x_test_pts(i));
+			}
+		}
+
+		str << t << " ";
+		for(size_t r = 0; r < N_res_samples - 1; r++)
+		{
+			double err = abs(E_values.col(r) - E_values.col(N_res_samples - 1)).max();
+			str << err << " ";
+		}
+		str << std::endl;
+
+		t += dt;
 	}
 
 }
