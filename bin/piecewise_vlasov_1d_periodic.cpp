@@ -102,8 +102,14 @@ int main()
 		xv( j + Nv*i, 1 ) = v;
 		constexpr double alpha = 0.01;
 		constexpr double k     = 0.5;
-		f( j + Nv*i ) = bump_on_tail_f0(x, v, alpha, k, 0.3, 4.5);
+		f( j + Nv*i ) = lin_landau_f0(x, v, alpha, k);
 	}
+
+	arma::mat remap_xv = xv;
+	arma::vec remap_f  = f;
+
+	size_t c = 0;
+	size_t c_max = 8;
 
 	arma::mat plotX( (res_n + 1)*(res_n + 1), 2 );
 	arma::vec plotf( (res_n + 1)*(res_n + 1) );
@@ -197,6 +203,15 @@ int main()
 		std::cout << "---------------------------------------\n";
 
 		t += dt;
+
+		// remap routine:
+		c++;
+		if(c == c_max)
+		{
+			f = sfx(remap_xv);
+			xv = remap_xv;
+			c = 0;
+		}
 	}
 
 	double main_elapsed = main_clock.elapsed();

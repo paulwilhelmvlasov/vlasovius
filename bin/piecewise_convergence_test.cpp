@@ -54,7 +54,7 @@ struct resolution
 	size_t Nv;
 };
 
-constexpr size_t order = 2;
+constexpr size_t order = 4;
 using wendland_t       = vlasovius::kernels::wendland<1,order>;
 using kernel_t         = vlasovius::kernels::tensorised_kernel<wendland_t>;
 using interpolator_t   = vlasovius::interpolators::piecewise_interpolator<kernel_t>;
@@ -105,7 +105,7 @@ int main()
 				xv[r]( j + Nv*i, 1 ) = v;
 				constexpr double alpha = 0.01;
 				constexpr double k     = 0.5;
-				f[r]( j + Nv*i ) = lin_landau_f0(x, v, alpha, k);
+				f[r]( j + Nv*i ) = two_stream_f0(x, v, alpha, k);
 			}
 	}
 

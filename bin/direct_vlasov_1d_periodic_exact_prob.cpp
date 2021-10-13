@@ -28,6 +28,7 @@
 #include <vlasovius/interpolators/direct_interpolator.h>
 #include <vlasovius/interpolators/pou_interpolator.h>
 #include <vlasovius/misc/periodic_poisson_1d.h>
+#include <vlasovius/misc/xv_kernel.h>
 
 double maxwellian(double v)
 {
@@ -51,189 +52,82 @@ double bump_on_tail_f0(double x, double v, double alpha = 0.01, double k = 0.5, 
     return 0.39894228040143267793994 * ((1.0 - nb) * std::exp(-0.5 * v * v)
         + nb * std::exp(-0.5 * (v - vb) * (v - vb)))
         * (1.0 + alpha * std::cos(k * x));
-
 }
 
 namespace vlasovius
 {
+namespace interpolators
+{
 
-template <size_t k1, size_t k2>
-class xv_kernel
+vlasovius::kernels::wendland<1,2> someKernel;
+double C = someKernel.integral();
+
+template <typename kernel>
+class dep_interpolator
 {
 public:
-	xv_kernel() = delete;
-	xv_kernel( double sigma_x, double sigma_v, double L );
+	dep_interpolator() = default;
+	dep_interpolator( const dep_interpolator&  )  = default;
+	dep_interpolator(       dep_interpolator&&  ) = default;
 
-	arma::mat operator()( const arma::mat &xv1, const arma::mat &xv2 ) const;
+	dep_interpolator& operator=( const dep_interpolator&  ) = default;
+	dep_interpolator& operator=(       dep_interpolator&& ) = default;
 
-	arma::mat eval_x( const arma::mat &xv1, const arma::mat &xv2 ) const;
+	dep_interpolator( kernel K, arma::mat X, arma::mat b,
+			             double tikhonov_mu = 0, size_t threads = 1 );
 
-	void eval( size_t dim, size_t n, size_t m,
-			         double *K, size_t ldK,
-	           const double *X, size_t ldX,
-	           const double *Y, size_t ldY, size_t threads = 1 ) const;
-
-	void mul( size_t dim, size_t n, size_t m, size_t nrhs,
-			         double *R, size_t ldK,
-	           const double *X, size_t ldX,
-	           const double *Y, size_t ldY,
-			   const double *C, size_t ldC, size_t threads = 1 ) const;
+	arma::mat operator()( const arma::mat &Y, size_t threads = 1 ) const;
+	const arma::mat& coeffs() const noexcept { return coeff; }
+	const arma::mat& points() const noexcept { return X; }
 
 private:
-	kernels::wendland<1,k1> W1;
-	kernels::wendland<1,k2> W2;
-	double L, inv_sigma_x, inv_sigma_v;
-	size_t num_images;
+	kernel    K;
+	arma::mat X;
+	arma::mat coeff;
 };
 
-
-template <size_t k1, size_t k2>
-xv_kernel<k1,k2>::xv_kernel( double sigma_x, double sigma_v, double L ):
-L { L } , inv_sigma_x { 1/sigma_x }, inv_sigma_v { 1/sigma_v },
-num_images { static_cast<size_t>(std::ceil(sigma_x/L)) }
-{}
-
-template <size_t k1, size_t k2>
-arma::mat xv_kernel<k1,k2>::operator()( const arma::mat &xv1, const arma::mat &xv2 ) const
+template <typename kernel>
+dep_interpolator<kernel>::dep_interpolator(kernel K, arma::mat X,
+		arma::mat b, double tikhonov_mu, size_t threads)
 {
-	size_t n = xv1.n_rows, m = xv2.n_rows;
+	size_t dim = X.n_cols; size_t N = X.n_cols;
+	arma::mat kermat(N, N);
+	K.eval(dim, N, N, &kermat(0,0), N, &X(0,0), N, &X(0,0), N, threads);
 
-	arma::mat result( n,m );
-	eval( 2, n, m, result.memptr(), n, xv1.memptr(), n, xv2.memptr(), m );
+	kermat.row(N - 1) = arma::rowvec(N, arma::fill::ones);
+
+	arma::colvec rhs = b;
+	rhs(N-1) = 4*3.14159265358979323846 / (C * C);
+
+	coeff = solve(kermat, rhs);
+}
+
+template <typename kernel>
+arma::mat dep_interpolator<kernel>::operator()( const arma::mat &Y, size_t threads ) const
+{
+	if ( Y.empty() )
+	{
+		throw std::logic_error { "vlasovius::dep_interpolator::operator(): "
+				                 "No evaluation points passed." };
+	}
+
+	if ( X.n_cols != Y.n_cols )
+	{
+		throw std::logic_error { "vlasovius::dep_interpolator::operator(): "
+		                         "Evaluation and Interpolation points have differing dimensions." };
+	}
+
+	size_t dim = X.n_cols, n = Y.n_rows, m = X.n_rows;
+	arma::mat result( Y.n_rows, coeff.n_cols, arma::fill::zeros );
+
+	K.mul( dim, n, m, coeff.n_cols, result.memptr(), n,
+                                         Y.memptr(), n,
+									     X.memptr(), m,
+	                                 coeff.memptr(), m, threads );
 	return result;
 }
 
-template <size_t k1, size_t k2>
-arma::mat xv_kernel<k1,k2>::eval_x( const arma::mat &xv1, const arma::mat &xv2 ) const
-{
-	size_t n = xv1.n_rows, m = xv2.n_rows;
-	arma::mat result(n,m);
-
-	using simd_t = ::vlasovius::misc::simd<double>;
-
-	double Linv = 1/L;
-	const double *X = xv1.memptr(), *Y = xv2.memptr();
-	      double *K = result.memptr();
-
-	#pragma omp parallel for
-	for ( size_t j = 0; j < m; ++j )
-	{
-		size_t i = 0;
-
-		simd_t y; y.fill(Y+j); y = y - L*floor(y*Linv);
-		double yy = Y[j]; yy -= L*std::floor(yy*Linv);
-
-		if constexpr ( simd_t::size() > 1 )
-		{
-			simd_t x, val;
-
-			for ( ; i + simd_t::size() < n; i += simd_t::size()  )
-			{
-				x.load(X + i);
-				x = x - L*floor(x*Linv);
-
-				val = W1( abs(x-y)*inv_sigma_x );
-				for ( size_t n = 1; n <= num_images; ++n )
-				{
-					val = val + W1( abs((x-y) + (n*L))*inv_sigma_x );
-					val = val + W1( abs((x-y) - (n*L))*inv_sigma_x );
-				}
-				val.store( K + i + j*n );
-			}
-		}
-
-		for ( ; i < n; ++i )
-		{
-			double xx = X[i]; xx -= L*std::floor(xx*Linv);
-
-			double val = W1( abs(xx-yy)*inv_sigma_x );
-			for ( size_t n = 1; n <= num_images; ++n )
-			{
-				val += W1( abs((xx-yy) + (n*L))*inv_sigma_x );
-				val += W1( abs((xx-yy) - (n*L))*inv_sigma_x );
-			}
-			K[ i + j*n ] = val;
-		}
-	}
-
-	return result;
 }
-
-template <size_t k1, size_t k2>
-void xv_kernel<k1,k2>::eval( size_t /* dim */, size_t n, size_t m,
-                                   double *K, size_t ldK,
-                             const double *X, size_t ldX,
-                             const double *Y, size_t ldY, size_t threads ) const
-{
-	using simd_t = ::vlasovius::misc::simd<double>;
-
-	double Linv = 1/L;
-
-	#pragma omp parallel for if(threads>1),num_threads(threads)
-	for ( size_t j = 0; j < m; ++j )
-	{
-		size_t i = 0;
-
-		simd_t y1; y1.fill(Y+j); y1 = y1 - L*floor(y1*Linv);
-		simd_t y2; y2.fill(Y+j+ldY);
-
-		double yy1 = Y[j]; yy1 -= L*std::floor(yy1*Linv);
-		double yy2 = Y[j+ldY];
-
-		if constexpr ( simd_t::size() > 1 )
-		{
-			simd_t x1, x2, val;
-
-			for ( ; i + simd_t::size() < n; i += simd_t::size()  )
-			{
-				x1.load(X + i);
-				x1 = x1 - L*floor(x1*Linv);
-
-				val = W1( abs(x1-y1)*inv_sigma_x );
-				for ( size_t n = 1; n <= num_images; ++n )
-				{
-					val = val + W1( abs((x1-y1) + (n*L))*inv_sigma_x );
-					val = val + W1( abs((x1-y1) - (n*L))*inv_sigma_x );
-				}
-
-				x2.load(X + i + ldX);
-				val = val * W2( abs(x2-y2)*inv_sigma_v );
-				val.store( K + i + j*ldK );
-			}
-		}
-
-		for ( ; i < n; ++i )
-		{
-			double xx1 = X[i], xx2 = X[i+ldX];
-
-			xx1 -= L*std::floor(xx1*Linv);
-			double val = W1( abs(xx1-yy1)*inv_sigma_x );
-			for ( size_t n = 1; n <= num_images; ++n )
-			{
-				val += W1( abs((xx1-yy1) + (n*L))*inv_sigma_x );
-				val += W1( abs((xx1-yy1) - (n*L))*inv_sigma_x );
-			}
-
-			val *= W2( abs(xx2-yy2)*inv_sigma_v );
-
-			K[ i + j*ldK ] = val;
-		}
-	}
-}
-
-template <size_t k1, size_t k2>
-void xv_kernel<k1,k2>::mul( size_t dim, size_t n, size_t m, size_t nrhs,
-		                          double *R, size_t ldR,
-                            const double *X, size_t ldX,
-                            const double *Y, size_t ldY,
-	                        const double *C, size_t ldC, size_t threads ) const
-{
-	arma::mat K( n, m );
-	eval( dim, n, m, K.memptr(), n, X, ldX, Y, ldY, threads );
-	cblas_dgemm( CblasColMajor, CblasNoTrans, CblasNoTrans,
-			     n, nrhs, m, 1.0, K.memptr(), n, C, ldC, 0.0, R, ldR );
-}
-
 }
 
 int main()
@@ -241,7 +135,8 @@ int main()
 	constexpr size_t order_x = 2;
 	constexpr size_t order_v = 2;
 	using kernel_t        = vlasovius::xv_kernel<order_x,order_v>;
-	using interpolator_t  = vlasovius::interpolators::direct_interpolator<kernel_t>;
+	//using interpolator_t  = vlasovius::interpolators::direct_interpolator<kernel_t>;
+	using interpolator_t  = vlasovius::interpolators::dep_interpolator<kernel_t>;
 	using poisson_t       = vlasovius::misc::poisson_gedoens::periodic_poisson_1d<8>;
 
 	using wendland_t = vlasovius::kernels::wendland<1,order_x>;
@@ -397,3 +292,4 @@ int main()
 	std::cout << "Time for needed for simulation: " << main_elapsed << ".\n";
 
 }
+
