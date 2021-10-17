@@ -132,7 +132,7 @@ int main()
 
 		if ( t + dt > T ) dt = T - t;
 
-		xv.col(0) += dt*xv.col(1);             // Move particles
+		xv.col(0) += dt * xv.col(1);           // Move particles
 		xv.col(0) -= L * floor(xv.col(0) / L); // Set to periodic positions.
 		interpolator_t sfx { K, xv, f, min_per_box, tikhonov_mu, num_threads };
 		rho.fill(1);

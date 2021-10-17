@@ -26,6 +26,7 @@
 #include <vlasovius/kernels/rbf_kernel.h>
 #include <vlasovius/kernels/periodised_kernel.h>
 #include <vlasovius/interpolators/direct_interpolator.h>
+#include <vlasovius/integrators/gauss_konrod.h>
 #include <vlasovius/interpolators/pou_interpolator.h>
 #include <vlasovius/misc/periodic_poisson_1d.h>
 #include <vlasovius/misc/xv_kernel.h>
@@ -41,10 +42,22 @@ double lin_landau_f0(double x, double v, double alpha = 0.01, double k = 0.5)
 			* std::exp( -0.5 * v*v );
 }
 
+arma::vec lin_landau_f0(const arma::mat& xv, double alpha = 0.01, double k = 0.5)
+{
+	return 0.39894228040143267793994 * ( 1 + alpha * arma::cos(k * xv.col(0)) )
+				% arma::exp( -0.5 * xv.col(1) % xv.col(1) );
+}
+
 double two_stream_f0(double x, double v, double alpha = 0.01, double k = 0.5)
 {
     return 0.39894228040143267793994 * v * v * std::exp(-0.5 * v * v )
 	        * (1.0 + alpha * std::cos(k * x));
+}
+
+arma::vec two_stream_f0(arma::mat xv, double alpha = 0.01, double k = 0.5)
+{
+    return 0.39894228040143267793994 * xv.col(1) % xv.col(1) % arma::exp(-0.5 * xv.col(1) % xv.col(1) )
+	        % (1.0 + alpha * arma::cos(k * xv.col(0)));
 }
 
 double bump_on_tail_f0(double x, double v, double alpha = 0.01, double k = 0.5, double nb = 0.1, double vb = 4.5)
@@ -52,6 +65,17 @@ double bump_on_tail_f0(double x, double v, double alpha = 0.01, double k = 0.5, 
     return 0.39894228040143267793994 * ((1.0 - nb) * std::exp(-0.5 * v * v)
         + nb * std::exp(-0.5 * (v - vb) * (v - vb)))
         * (1.0 + alpha * std::cos(k * x));
+}
+
+template<typename fct_2d_1d>
+arma::vec f_comp_phi(const arma::vec& xv, const fct_2d_1d& phi_x, const fct_2d_1d& phi_v)
+{
+	constexpr double alpha = 0.01;
+	constexpr double k = 0.5;
+	arma::mat phi_xv = xv;
+	phi_xv.col(0) = phi_x(xv);
+	phi_xv.col(1) = phi_v(xv);
+	return lin_landau_f0(phi_xv);
 }
 
 
@@ -73,9 +97,13 @@ int main()
 	double v_max = 6;
 	kernel_t K( sigma_x, sigma_v, L );
 
+	size_t Nx = 32, Nv = 64;
+
 	size_t num_threads = omp_get_max_threads();
 
-	arma::mat xv;
+	arma::mat init_xv;
+	arma::mat curr_xv;
+	poisson_t poisson(0,L,256);
 	arma::mat rho_points;
 	{
 		arma::vec rho_tmp = poisson.quadrature_nodes();
@@ -88,29 +116,27 @@ int main()
 	}
 
 	// Initialise xv.
-	xv.set_size( Nx*Nv,2 );
-	f.resize( Nx*Nv );
+	init_xv.set_size( Nx*Nv,2 );
+	curr_xv.set_size( Nx*Nv,2 );
 	for ( size_t i = 0; i < Nx; ++i )
 		for ( size_t j = 0; j < Nv; ++j )
 		{
 			double x = i * (L/Nx);
 			double v = -v_max + j*( 2 * v_max/(Nv-1));
 
-			xv( j + Nv*i, 0 ) = x;
-			xv( j + Nv*i, 1 ) = v;
-			constexpr double alpha = 0.01;
-			constexpr double k     = 0.5;
-			f( j + Nv*i ) = two_stream_f0(x, v, alpha, k);
+			init_xv( j + Nv*i, 0 ) = x;
+			init_xv( j + Nv*i, 1 ) = v;
 		}
+	curr_xv = init_xv;
 
-	arma::mat plotX( 201*201, 2 );
-	arma::vec plotf( 201*201 );
-	for ( size_t i = 0; i <= 200; ++i )
-		for ( size_t j = 0; j <= 200; ++j )
+	arma::mat plotX( (res_n + 1)*(res_n + 1), 2 );
+	arma::vec plotf( (res_n + 1)*(res_n + 1) );
+	for ( size_t i = 0; i <= res_n; ++i )
+		for ( size_t j = 0; j <= res_n; ++j )
 		{
-			plotX(j + 201*i,0) = L * i/200.;
-			plotX(j + 201*i,1) = 2 * v_max * j/200. - v_max;
-			plotf(j + 201*i) = 0;
+			plotX(j + (res_n + 1)*i,0) = L * i/double(res_n);
+			plotX(j + (res_n + 1)*i,1) = 2*v_max * j/double(res_n) - v_max;
+			plotf(j + (res_n + 1)*i) = 0;
 		}
 
 	size_t count = 0;
@@ -123,10 +149,56 @@ int main()
 
 		if ( t + dt > T ) dt = T - t;
 
-		xv.col(0) += dt*xv.col(1);             // Move particles
-		xv.col(0) -= L * floor(xv.col(0) / L); // Set to periodic positions.
+		// v-positions are already updated correctly. x positions are updated now:
+		curr_xv.col(0) += dt*curr_xv.col(1);             // Move particles
+		curr_xv.col(0) -= L * floor(curr_xv.col(0) / L); // Set to periodic positions.
 
-		// Ab hier Phase-Flow-Rekonstruktions-Algorithmus.
+		// Reconstruct inverse phase flow:
+		interpolator_t phi_x(K, curr_xv, init_xv.col(0), mu, num_threads);
+		interpolator_t phi_v(K, curr_xv, init_xv.col(1), mu, num_threads);
+
+
+		auto comp = [&](arma::vec xv){
+			return f_comp_phi<interpolator_t>(xv, phi_x, phi_v);
+		};
+
+		arma::vec rho = vlasovius::integrators::num_rho_1d(comp, rho_points.col(0), v_max, 1e-6, num_threads); // Does this work?
+
+		poisson.update_rho( rho );
+		double max_e = 0;
+		for ( size_t i = 0; i < curr_xv.n_rows; ++i )
+		{
+			double E = poisson.E(curr_xv(i,0));
+			curr_xv(i,1) += -dt*E;
+			max_e = std::max(max_e,std::abs(E));
+		}
+		str << t << " " << max_e  << std::endl;
+		std::cout << "Max-norm of E: " << max_e << "." << std::endl;
+
+		plotf = comp(plotX);
+		if ( count++ % 4 == 0 )
+		{
+			std::ofstream fstr( "f_" + std::to_string(t) + "s.txt" );
+			for ( size_t i = 0; i <= res_n; ++i )
+			{
+				for ( size_t j = 0; j <= res_n; ++j )
+				{
+					arma::uword index = j + (res_n + 1)*i;
+					double x = plotX(index,0);
+					double v = plotX(index,1);
+					double f = plotf(index) - lin_landau_f0(x,v);
+					fstr << x << " " << v
+						 << " " << f << std::endl;
+				}
+				str << "\n";
+			}
+		}
+
+		double elapsed = clock.elapsed();
+		std::cout << "Time for needed for time-step: " << elapsed << ".\n";
+		std::cout << "---------------------------------------\n";
+
+		t += dt;
 
 	}
 
