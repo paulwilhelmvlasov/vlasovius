@@ -28,6 +28,7 @@
 #include <vlasovius/interpolators/direct_interpolator.h>
 #include <vlasovius/integrators/gauss_konrod.h>
 #include <vlasovius/interpolators/pou_interpolator.h>
+#include <vlasovius/interpolators/piecewise_interpolator.h>
 #include <vlasovius/misc/periodic_poisson_1d.h>
 #include <vlasovius/misc/xv_kernel.h>
 
@@ -40,6 +41,12 @@ double lin_landau_f0(double x, double v, double alpha = 0.01, double k = 0.5)
 {
 	return 0.39894228040143267793994 * ( 1 + alpha * std::cos(k * x) )
 			* std::exp( -0.5 * v*v );
+}
+
+arma::vec lin_landau_f0(const arma::vec& x, const arma::vec& v,double alpha = 0.01, double k = 0.5)
+{
+	return 0.39894228040143267793994 * ( 1 + alpha * arma::cos(k * x) )
+				% arma::exp( -0.5 * v % v );
 }
 
 arma::vec lin_landau_f0(const arma::mat& xv, double alpha = 0.01, double k = 0.5)
@@ -73,9 +80,27 @@ arma::vec f_comp_phi(const arma::vec& xv, const fct_2d_1d& phi_x, const fct_2d_1
 	constexpr double alpha = 0.01;
 	constexpr double k = 0.5;
 	arma::mat phi_xv = xv;
+
+	//vlasovius::misc::stopwatch clock_1;
+	//vlasovius::misc::stopwatch total_clock;
 	phi_xv.col(0) = phi_x(xv);
+	//double t = clock_1.elapsed();
+	//std::cout << "Phi_x: " << t << " s. ";
+
+	//vlasovius::misc::stopwatch clock_2;
 	phi_xv.col(1) = phi_v(xv);
-	return lin_landau_f0(phi_xv);
+	//t = clock_2.elapsed();
+	//std::cout << "Phi_v: " << t << " s. ";
+
+	//vlasovius::misc::stopwatch clock_3;
+	arma::vec return_value = lin_landau_f0(phi_xv);
+	//t = clock_3.elapsed();
+	//std::cout << "Value: " << t << " s. ";
+
+	//double t_total = total_clock.elapsed();
+//	std::cout << "Total: " << t_total << " s. " << std::endl;
+
+	return return_value;
 }
 
 
@@ -84,7 +109,8 @@ int main()
 	constexpr size_t order_x = 2;
 	constexpr size_t order_v = 2;
 	using kernel_t        = vlasovius::xv_kernel<order_x,order_v>;
-	using interpolator_t  = vlasovius::interpolators::direct_interpolator<kernel_t>;
+	//using interpolator_t  = vlasovius::interpolators::direct_interpolator<kernel_t>;
+	using interpolator_t   = vlasovius::interpolators::piecewise_interpolator<kernel_t>;
 	using poisson_t       = vlasovius::misc::poisson_gedoens::periodic_poisson_1d<8>;
 
 	using wendland_t = vlasovius::kernels::wendland<1,order_x>;
@@ -92,12 +118,14 @@ int main()
 
 	size_t res_n = 400;
 
+	constexpr size_t min_per_box = 200;
+
 	double L = 4*3.14159265358979323846, sigma_x  = 2, sigma_v = 2;
 	double mu = 1e-10;
 	double v_max = 6;
 	kernel_t K( sigma_x, sigma_v, L );
 
-	size_t Nx = 32, Nv = 64;
+	size_t Nx = 64, Nv = 128;
 
 	size_t num_threads = omp_get_max_threads();
 
@@ -154,17 +182,28 @@ int main()
 		curr_xv.col(0) -= L * floor(curr_xv.col(0) / L); // Set to periodic positions.
 
 		// Reconstruct inverse phase flow:
-		interpolator_t phi_x(K, curr_xv, init_xv.col(0), mu, num_threads);
-		interpolator_t phi_v(K, curr_xv, init_xv.col(1), mu, num_threads);
+		vlasovius::misc::stopwatch clock_interpolation;
+		//interpolator_t phi_x(K, curr_xv, init_xv.col(0), mu, num_threads);
+		//interpolator_t phi_v(K, curr_xv, init_xv.col(1), mu, num_threads);
+		interpolator_t phi_x(K, curr_xv, init_xv.col(0), min_per_box, mu, num_threads);
+		interpolator_t phi_v(K, curr_xv, init_xv.col(1), min_per_box, mu, num_threads);
+		double interpol_t = clock_interpolation.elapsed();
+		std::cout << "The two interpolations needed " << interpol_t << " s."<< std::endl;
 
 
 		auto comp = [&](arma::vec xv){
 			return f_comp_phi<interpolator_t>(xv, phi_x, phi_v);
 		};
 
-		arma::vec rho = vlasovius::integrators::num_rho_1d(comp, rho_points.col(0), v_max, 1e-6, num_threads); // Does this work?
+		vlasovius::misc::stopwatch clock_integration;
+		arma::vec rho = vlasovius::integrators::num_rho_1d(comp, rho_points.col(0), v_max, 1e-6, num_threads);
+		double integration_t = clock_integration.elapsed();
+		std::cout << "The rho integration needed " << integration_t << " s."<< std::endl;
 
+		vlasovius::misc::stopwatch clock_poisson;
 		poisson.update_rho( rho );
+		double poisson_t = clock_poisson.elapsed();
+		std::cout << "The poisson-solver took " << poisson_t << " s." << std::endl;
 		double max_e = 0;
 		for ( size_t i = 0; i < curr_xv.n_rows; ++i )
 		{
@@ -175,10 +214,14 @@ int main()
 		str << t << " " << max_e  << std::endl;
 		std::cout << "Max-norm of E: " << max_e << "." << std::endl;
 
+
+		vlasovius::misc::stopwatch clock_eval;
 		plotf = comp(plotX);
+		double eval_t = clock_eval.elapsed();
+		std::cout << "The evaluating f needed " << eval_t << " s."<< std::endl;
 		if ( count++ % 4 == 0 )
 		{
-			std::ofstream fstr( "f_" + std::to_string(t) + "s.txt" );
+			std::ofstream fstr( "f_diff_" + std::to_string(t) + "s.txt" );
 			for ( size_t i = 0; i <= res_n; ++i )
 			{
 				for ( size_t j = 0; j <= res_n; ++j )
@@ -190,7 +233,23 @@ int main()
 					fstr << x << " " << v
 						 << " " << f << std::endl;
 				}
-				str << "\n";
+				fstr << "\n";
+			}
+			fstr.close();
+
+			fstr = std::ofstream( "f_" + std::to_string(t) + "s.txt" );
+			for ( size_t i = 0; i <= res_n; ++i )
+			{
+				for ( size_t j = 0; j <= res_n; ++j )
+				{
+					arma::uword index = j + (res_n + 1)*i;
+					double x = plotX(index,0);
+					double v = plotX(index,1);
+					double f = plotf(index);
+					fstr << x << " " << v
+						 << " " << f << std::endl;
+				}
+				fstr << "\n";
 			}
 		}
 

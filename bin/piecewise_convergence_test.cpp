@@ -54,7 +54,7 @@ struct resolution
 	size_t Nv;
 };
 
-constexpr size_t order = 4;
+constexpr size_t order = 1;
 using wendland_t       = vlasovius::kernels::wendland<1,order>;
 using kernel_t         = vlasovius::kernels::tensorised_kernel<wendland_t>;
 using interpolator_t   = vlasovius::interpolators::piecewise_interpolator<kernel_t>;
@@ -80,7 +80,7 @@ int main()
 
 	std::vector<resolution> res
 	{
-		{32, 64}, {48, 96}, {64, 128}, {128, 256}, {256, 1024}, test_res
+		{32, 64}, {40, 70}, {50, 80}, {60, 90}, {64, 128}, {96, 180}, {128, 256}, {256, 512}, {512, 1024}, test_res
 	};
 
 	arma::uword N_res_samples = res.size();
@@ -121,7 +121,7 @@ int main()
 	vlasovius::geometry::kd_tree rho_tree(rho_points);
 
 	size_t count = 0;
-	double t = 0, T = 30, dt = 1./16.;
+	double t = 0, T = 10, dt = 1./16.;
 	std::ofstream str("E_infty_err.txt");
 	while ( t < T )
 	{
