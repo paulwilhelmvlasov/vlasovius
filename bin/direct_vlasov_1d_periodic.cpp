@@ -46,10 +46,11 @@ double two_stream_f0(double x, double v, double alpha = 0.01, double k = 0.5)
 	        * (1.0 + alpha * std::cos(k * x));
 }
 
-double bump_on_tail_f0(double x, double v, double alpha = 0.01, double k = 0.5, double nb = 0.1, double vb = 4.5)
+double bump_on_tail_f0(double x, double v, double alpha = 0.01, double k = 0.5, double np = 0.9,
+		double nb = 0.2, double vb = 4.5, double vt = 0.5)
 {
-    return 0.39894228040143267793994 * ((1.0 - nb) * std::exp(-0.5 * v * v)
-        + nb * std::exp(-0.5 * (v - vb) * (v - vb)))
+    return 0.39894228040143267793994 *
+    	(np * std::exp(-0.5 * v * v) + nb * std::exp(-0.5 * (v - vb) * (v - vb) / (vt * vt)))
         * (1.0 + alpha * std::cos(k * x));
 
 }
@@ -238,8 +239,8 @@ void xv_kernel<k1,k2>::mul( size_t dim, size_t n, size_t m, size_t nrhs,
 
 int main()
 {
-	constexpr size_t order_x = 2;
-	constexpr size_t order_v = 2;
+	constexpr size_t order_x = 4;
+	constexpr size_t order_v = 4;
 	using kernel_t        = vlasovius::xv_kernel<order_x,order_v>;
 	using interpolator_t  = vlasovius::interpolators::direct_interpolator<kernel_t>;
 	using poisson_t       = vlasovius::misc::poisson_gedoens::periodic_poisson_1d<8>;
@@ -247,11 +248,11 @@ int main()
 	using wendland_t = vlasovius::kernels::wendland<1,order_x>;
 	wendland_t W;
 
-	size_t res_n = 400;
+	size_t res_n = 100;
 
-	double L = 4*3.14159265358979323846, sigma_x  = 2, sigma_v = 2;
+	double L = 2*3.14159265358979323846 / 0.3, sigma_x  = 2, sigma_v = 2;
 	double mu = 1e-10;
-	double v_max = 6;
+	double v_max = 8;
 	kernel_t K( sigma_x, sigma_v, L );
 
 
@@ -281,7 +282,7 @@ int main()
 	}
 
 	// Initialise xv.
-	size_t Nx = 32, Nv = 128;
+	size_t Nx = 32, Nv = 64;
 	xv.set_size( Nx*Nv,2 );
 	f.resize( Nx*Nv );
 	for ( size_t i = 0; i < Nx; ++i )
@@ -292,9 +293,11 @@ int main()
 
 		xv( j + Nv*i, 0 ) = x;
 		xv( j + Nv*i, 1 ) = v;
-		constexpr double alpha = 0.01;
-		constexpr double K     = 0.5;
-		f( j + Nv*i ) = lin_landau_f0(x, v, alpha, K);
+		constexpr double alpha = 0.04;
+		constexpr double K     = 0.3;
+		//f( j + Nv*i ) = lin_landau_f0(x, v, alpha, K);
+		//f( j + Nv*i ) = two_stream_f0(x, v, alpha, K);
+		f( j + Nv*i ) = bump_on_tail_f0(x, v, alpha, K);
 	}
 
 	arma::mat plotX( (res_n + 1)*(res_n + 1), 2 );
@@ -326,7 +329,7 @@ int main()
 
 	size_t count = 0;
 	vlasovius::misc::stopwatch main_clock;
-	double t = 0, T = 50.25, dt = 1./4.;
+	double t = 0, T = 500.25, dt = 1./4.;
 	std::ofstream str("E.txt");
 	while ( t < T )
 	{
@@ -378,7 +381,8 @@ int main()
 					double v = plotX(index,1);
 					double f = plotf(index);
 					fstr << x << " " << v << " "
-							<< f - maxwellian(v) << std::endl;
+							//<< f - maxwellian(v) << std::endl;
+							<< f << std::endl;
 					/*
 					if(f < 0)
 						fstr << 0 << std::endl;

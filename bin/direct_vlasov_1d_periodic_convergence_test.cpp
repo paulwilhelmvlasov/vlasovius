@@ -43,13 +43,14 @@ double two_stream_f0(double x, double v, double alpha = 0.01, double k = 0.5)
 	        * (1.0 + alpha * std::cos(k * x));
 }
 
-double bump_on_tail_f0(double x, double v, double alpha = 0.01, double k = 0.5, double nb = 0.1, double vb = 4.5)
+double bump_on_tail_f0(double x, double v, double alpha = 0.01, double k = 0.5, double np = 0.9,
+		double nb = 0.2, double vb = 4.5, double vt = 0.5)
 {
-    return 0.39894228040143267793994
-    		* ( (1.0 - nb) * std::exp(-0.5 * v * v)
-    				+ 2.0 * nb * std::exp(-2 * (v - vb) * (v - vb)) )
+    return 0.39894228040143267793994 *
+    	(np * std::exp(-0.5 * v * v) + nb * std::exp(-0.5 * (v - vb) * (v - vb) / (vt * vt)))
         * (1.0 + alpha * std::cos(k * x));
 }
+
 
 namespace vlasovius
 {
@@ -261,11 +262,11 @@ int main()
 	arma::rowvec sigma { 6.0, 3.0 };
 	kernel_t K( sigma[0], sigma[1], L );
 
-	double v_max = 7.5;
+	double v_max = 6;
 
 	size_t num_threads = omp_get_max_threads();
 
-	resolution test_res {128, 256};
+	//resolution test_res {128, 256};
 
 	/*
 	std::vector<resolution> res
@@ -276,18 +277,19 @@ int main()
 
 	std::vector<double> h_res
 	{
-		0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1
+		//0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1
+		0.4, 0.2, 0.1
 	};
 
-	arma::uword N_res_samples = h_res.size() + 1;
+	arma::uword N_res_samples = h_res.size();// + 1;
 	std::vector<resolution> res;
 
-	for(size_t i = 0; i < N_res_samples - 1; ++i)
+	for(size_t i = 0; i < N_res_samples/* - 1*/; ++i)
 	{
 		res.push_back({size_t(L/h_res[i]), size_t(20/h_res[i])});
 	}
 
-	res.push_back(test_res);
+	//res.push_back(test_res);
 
 	arma::uword test_N = 300;
 
@@ -379,13 +381,20 @@ int main()
 		}
 
 		str << t << " ";
-		for(size_t r = 0; r < N_res_samples - 1; r++)
+		/*for(size_t r = 0; r < N_res_samples - 1; r++)
 		{
 			//double err = abs(E_values.col(r) - E_values.col(N_res_samples - 1)).max();
 			// Computing L1-error using mid-point rule:
 			double err = hx_test * hv_test * arma::accu(arma::abs(fcts[r](xv_test_pts) - fcts[N_res_samples - 1](xv_test_pts)));
 			str << err << " ";
-		}
+		}*/
+		double err_h = hx_test * hv_test * arma::accu(arma::abs(fcts[0](xv_test_pts)
+				- fcts[2](xv_test_pts)));
+		double err_2h = hx_test * hv_test * arma::accu(arma::abs(fcts[1](xv_test_pts)
+						- fcts[2](xv_test_pts)));
+		str << err_h << " ";
+		str << err_2h << " ";
+		str << std::log2(err_h / err_2h);
 		str << std::endl;
 
 		fcts.clear();

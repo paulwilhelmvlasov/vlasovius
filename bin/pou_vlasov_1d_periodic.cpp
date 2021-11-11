@@ -45,6 +45,14 @@ double two_stream_f0(double x, double v, double alpha = 0.01, double k = 0.5)
 	        * (1.0 + alpha * std::cos(k * x));
 }
 
+double bump_on_tail_f0(double x, double v, double alpha = 0.01, double k = 0.5, double np = 0.9,
+		double nb = 0.2, double vb = 4.5, double vt = 0.5)
+{
+    return 0.39894228040143267793994 *
+    	(np * std::exp(-0.5 * v * v) + nb * std::exp(-0.5 * (v - vb) * (v - vb) / (vt * vt)))
+        * (1.0 + alpha * std::cos(k * x));
+}
+
 
 int main()
 {
@@ -67,7 +75,7 @@ int main()
 
 	kernel_t K( {}, sigma );
 
-	size_t Nx = 64, Nv = 128;
+	size_t Nx = 128, Nv = 512;
 
 	size_t num_threads = omp_get_max_threads();
 
@@ -107,7 +115,8 @@ int main()
 		xv( j + Nv*i, 1 ) = v;
 		constexpr double alpha = 0.01;
 		constexpr double k     = 0.5;
-		f( j + Nv*i ) = two_stream_f0(x, v, alpha, k);
+		//f( j + Nv*i ) = two_stream_f0(x, v, alpha, k);
+		f( j + Nv*i ) = bump_on_tail_f0(x, v, 0.04, 0.3);
 	}
 
 	arma::mat plotX( 201*201, 2 );

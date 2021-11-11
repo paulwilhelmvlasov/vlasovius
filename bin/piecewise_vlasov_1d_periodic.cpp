@@ -45,16 +45,15 @@ double two_stream_f0(double x, double v, double alpha = 0.01, double k = 0.5)
 	        * (1.0 + alpha * std::cos(k * x));
 }
 
-double bump_on_tail_f0(double x, double v, double alpha = 0.01, double k = 0.5, double nb = 0.1, double vb = 4.5)
+double bump_on_tail_f0(double x, double v, double alpha = 0.01, double k = 0.5, double np = 0.9,
+		double nb = 0.2, double vb = 4.5, double vt = 0.5)
 {
-    return 0.39894228040143267793994
-    		* ( (1.0 - nb) * std::exp(-0.5 * v * v)
-    				+ 2.0 * nb * std::exp(-2 * (v - vb) * (v - vb)) )
+    return 0.39894228040143267793994 *
+    	(np * std::exp(-0.5 * v * v) + nb * std::exp(-0.5 * (v - vb) * (v - vb) / (vt * vt)))
         * (1.0 + alpha * std::cos(k * x));
-
 }
 
-constexpr size_t order = 4;
+constexpr size_t order = 2;
 using wendland_t       = vlasovius::kernels::wendland<1,order>;
 using kernel_t         = vlasovius::kernels::tensorised_kernel<wendland_t>;
 using interpolator_t   = vlasovius::interpolators::piecewise_interpolator<kernel_t>;
@@ -65,7 +64,7 @@ int main()
 	constexpr double tikhonov_mu { 1e-10 };
 	constexpr size_t min_per_box = 200;
 
-	double L = 4*3.14159265358979323846;
+	double L = 2*3.14159265358979323846 / 0.3;
 
 	wendland_t W;
 	arma::rowvec sigma { 6.0, 3.0 };
@@ -77,7 +76,7 @@ int main()
 	size_t Nx = 128, Nv = 512;
 	std::cout << "Number of particles: " << Nx*Nv << ".\n";
 
-	double v_max = 10;
+	double v_max = 8;
 
 	size_t num_threads = omp_get_max_threads();
 
@@ -102,7 +101,8 @@ int main()
 		xv( j + Nv*i, 1 ) = v;
 		constexpr double alpha = 0.01;
 		constexpr double k     = 0.5;
-		f( j + Nv*i ) = lin_landau_f0(x, v, alpha, k);
+		//f( j + Nv*i ) = lin_landau_f0(x, v, alpha, k);
+		f( j + Nv*i ) = bump_on_tail_f0(x, v, 0.04, 0.3);
 	}
 
 	arma::mat remap_xv = xv;
@@ -123,7 +123,7 @@ int main()
 
 	vlasovius::misc::stopwatch main_clock;
 	size_t count = 0;
-	double t = 0, T = 50.25, dt = 1./16.;
+	double t = 0, T = 500.25, dt = 1./16.;
 	std::ofstream str("E.txt");
 	while ( t < T )
 	{
@@ -135,6 +135,8 @@ int main()
 		xv.col(0) += dt * xv.col(1);           // Move particles
 		xv.col(0) -= L * floor(xv.col(0) / L); // Set to periodic positions.
 		interpolator_t sfx { K, xv, f, min_per_box, tikhonov_mu, num_threads };
+
+		//Compute rho:
 		rho.fill(1);
 		#pragma omp parallel
 		{
@@ -187,13 +189,32 @@ int main()
 				double v = plotX(index,1);
 				double f = plotf(index);
 				fstr << x << " " << v
-					 << " ";
-				if(f < 0)
+					 << " " << f << std::endl;
+				/*if(f < 0)
 					fstr << 0 << std::endl;
 				else
 					fstr << f << std::endl;
+				*/
 			}
 			fstr << "\n";
+		}
+
+		std::ofstream xvstr( "xv_" + std::to_string(t) + "s.txt" );
+		for(size_t i = 0; i < xv.n_rows; ++i)
+		{
+			xvstr << xv(i, 0) << " " << xv(i, 1) << std::endl;
+		}
+
+
+		std::ofstream coeff_str( "coeff_" + std::to_string(t) + "s.txt" );
+		for(size_t i = 0; i < sfx.cover.n_rows; i++)
+		{
+			arma::mat m_xv = sfx.local_interpolants[i].points();
+			arma::mat m_c = sfx.local_interpolants[i].coeffs();
+			for(size_t j = 0; j < m_xv.size(); j++)
+			{
+				coeff_str /*<< xv(j, 0) << " " << xv(j, 1) << " "*/ << m_c(j, 0)  << std::endl;
+			}
 		}
 
 		}
