@@ -212,7 +212,7 @@ void xv_kernel<k1,k2>::mul( size_t dim, size_t n, size_t m, size_t nrhs,
 
 int main()
 {
-	constexpr size_t order = 4;
+	constexpr size_t order = 2;
 	using kernel_t        = vlasovius::xv_kernel<order,4>;
 	using interpolator_t  = vlasovius::interpolators::direct_interpolator<kernel_t>;
 	using poisson_t       = vlasovius::misc::poisson_gedoens::periodic_poisson_1d<8>;
@@ -220,7 +220,9 @@ int main()
 	using wendland_t = vlasovius::kernels::wendland<1,4>;
 	wendland_t W;
 
-	double L = 4*3.14159265358979323846, sigma_x  = 3, sigma_v = 0.5;
+	double L = 4*3.14159265358979323846, sigma_x  = 3, sigma_v = 1;
+	double mu = 1e-10;
+	double vmax = 6;
 	kernel_t K( sigma_x, sigma_v, L );
 
 
@@ -249,15 +251,26 @@ int main()
 		}
 	}
 
+	size_t res = 200;
+	arma::mat plotX( (res + 1)*(res + 1), 2 );
+	arma::vec plotf( (res + 1)*(res + 1));
+	for ( size_t i = 0; i <= res; ++i )
+		for ( size_t j = 0; j <= res; ++j )
+		{
+			plotX(j + (res + 1)*i,0) = L * i/double(res);
+			plotX(j + (res + 1)*i,1) = 2*vmax * j/double(res) - vmax;
+			plotf(j + (res + 1)*i) = 0;
+		}
+
 	// Initialise xv.
-	size_t Nx = 20, Nv = 80;
+	size_t Nx = 32, Nv = 64;
 	xv.set_size( Nx*Nv,2 );
 	f.resize( Nx*Nv );
 	for ( size_t i = 0; i < Nx; ++i )
 	for ( size_t j = 0; j < Nv; ++j )
 	{
 		double x = i * (L/Nx);
-		double v = -6 + j*(12./(Nv-1));
+		double v = -vmax + j*(2*vmax/(Nv-1));
 
 		xv( j + Nv*i, 0 ) = x;
 		xv( j + Nv*i, 1 ) = v;
@@ -266,11 +279,33 @@ int main()
 		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1 + alpha*std::cos(K*x) ) * std::exp( -v*v/2 );
 	}
 
-	double t = 0, T = 100, dt = 1./8.;
+	size_t count = 0;
+	double t = 0, T = 50, dt = 1./8.;
 	std::ofstream str("E.txt");
 	while ( t < T )
 	{
 		std::cout << "t = " << t << ". " << std::endl;
+
+		if ( count++ % 8 == 0 )
+		{
+			interpolator_t sfx { K, xv, f, mu, num_threads };
+			plotf = sfx(plotX);
+			std::ofstream fstr( "f_" + std::to_string(t) + ".txt" );
+			for ( size_t i = 0; i <= res; ++i )
+			{
+				for ( size_t j = 0; j <= res; ++j )
+				{
+					double x = plotX(j + (res + 1)*i,0);
+					double v = plotX(j + (res + 1)*i,1);
+					double f = plotf(j+(res+1)*i) - 0.39894228040143267793994 * std::exp(-0.5 * v * v);
+					fstr << x << " " << v
+				    	 << " " << f << std::endl;
+				}
+				fstr << "\n";
+			}
+		}
+
+
 		vlasovius::misc::stopwatch clock;
 		for ( size_t stage = 0; stage < 4; ++stage )
 		{
@@ -281,7 +316,7 @@ int main()
 			k_xv[ stage ].resize( xv.n_rows, xv.n_cols );
 			k_xv[ stage ].col(0) = xv_stage.col(1);
 
-			interpolator_t sfx( K, xv_stage, f, 0, num_threads );
+			interpolator_t sfx( K, xv_stage, f, mu, num_threads );
 			arma::vec rho = arma::vec(rho_points.n_rows,arma::fill::ones) -
 					        2 * W.integral() * sigma_v * K.eval_x( rho_points, xv_stage ) * sfx.coeffs();
 			poisson.update_rho( rho );

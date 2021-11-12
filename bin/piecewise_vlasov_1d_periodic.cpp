@@ -29,7 +29,7 @@
 #include <vlasovius/misc/periodic_poisson_1d.h>
 
 
-constexpr size_t order = 2;
+constexpr size_t order = 4;
 using wendland_t       = vlasovius::kernels::wendland<1,order>;
 using kernel_t         = vlasovius::kernels::tensorised_kernel<wendland_t>;
 using interpolator_t   = vlasovius::interpolators::piecewise_interpolator<kernel_t>;
@@ -40,7 +40,8 @@ int main()
 	constexpr double tikhonov_mu { 1e-10 };
 	constexpr size_t min_per_box = 200;
 
-	double L = 2*3.14159265358979323846 / 0.3;
+	double L = 4 * 3.14159265358979323846;
+	//double L = 2*3.14159265358979323846 / 0.3; // Bump on tail
 
 	wendland_t W;
 	arma::rowvec sigma { 6, 3 };
@@ -48,7 +49,7 @@ int main()
 	kernel_t   Kx( W, arma::rowvec { sigma(0) } );
 
 
-	size_t Nx = 512, Nv = 512;
+	size_t Nx = 512, Nv = 1024;
 	std::cout << "Number of particles: " << Nx*Nv << ".\n";
 
 	size_t num_threads = omp_get_max_threads();
@@ -61,6 +62,8 @@ int main()
 	arma::vec rho( rho_points.size() );
 	vlasovius::geometry::kd_tree rho_tree(rho_points);
 
+	double vmax = 8;
+
 	// Initialise xv.
 	xv.set_size( Nx*Nv,2 );
 	f.resize( Nx*Nv );
@@ -68,10 +71,17 @@ int main()
 	for ( size_t j = 0; j < Nv; ++j )
 	{
 		double x = (i+0.5) * (L/Nx);
-		double v = -8 + j*(16./(Nv-1));
+		double v = -vmax + j*(2*vmax/(Nv-1));
 
 		xv( j + Nv*i, 0 ) = x;
 		xv( j + Nv*i, 1 ) = v;
+		constexpr double alpha = 0.01;
+		constexpr double k     = 0.5;
+		// Linear Landau damping:
+		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
+				* std::exp(-0.5 * v * v);
+		/*
+		// Bump on tail benchmark:
 		constexpr double alpha = 0.04;
 		constexpr double k     = 0.3;
 		constexpr double np = 0.9;
@@ -81,20 +91,22 @@ int main()
 		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
 				* (np * std::exp( -0.5 * v*v )
 				+  nb * std::exp( -0.5 * (v-vb)*(v-vb) / (vt * vt)) );
+		*/
 	}
 
-	arma::mat plotX( 401*401, 2 );
-	arma::vec plotf( 401*401 );
-	for ( size_t i = 0; i <= 400; ++i )
-		for ( size_t j = 0; j <= 400; ++j )
+	size_t res = 200;
+	arma::mat plotX( (res + 1)*(res + 1), 2 );
+	arma::vec plotf( (res + 1)*(res + 1));
+	for ( size_t i = 0; i <= res; ++i )
+		for ( size_t j = 0; j <= res; ++j )
 		{
-			plotX(j + 401*i,0) = L * i/400.;
-			plotX(j + 401*i,1) = 16.0 * j/400. - 8.0;
-			plotf(j + 401*i) = 0;
+			plotX(j + (res + 1)*i,0) = L * i/double(res);
+			plotX(j + (res + 1)*i,1) = 2*vmax * j/double(res) - vmax;
+			plotf(j + (res + 1)*i) = 0;
 		}
 
 	size_t count = 0;
-	double t = 0, T = 2000, dt = 1./16.;
+	double t = 0, T = 50.25, dt = 1./16.;
 	std::ofstream str("E.txt");
 	while ( t < T )
 	{
@@ -103,21 +115,24 @@ int main()
 
 		if ( t + dt > T ) dt = T - t;
 
-//		if ( count++ % 16 == 0 )
-//		{
-//			interpolator_t sfx { K, xv, f, min_per_box, tikhonov_mu, num_threads };
-//			plotf = sfx(plotX);
-//			std::ofstream fstr( "f_" + std::to_string(t) + ".txt" );
-//			for ( size_t i = 0; i <= 400; ++i )
-//			{
-//				for ( size_t j = 0; j <= 400; ++j )
-//				{
-//					fstr << plotX(j + 401*i,0) << " " << plotX(j + 401*i,1)
-//				    		 << " " << plotf(j+401*i) << std::endl;
-//				}
-//				fstr << "\n";
-//			}
-//		}
+		if ( count++ % 16 == 0 )
+		{
+			interpolator_t sfx { K, xv, f, min_per_box, tikhonov_mu, num_threads };
+			plotf = sfx(plotX);
+			std::ofstream fstr( "f_" + std::to_string(t) + ".txt" );
+			for ( size_t i = 0; i <= res; ++i )
+			{
+				for ( size_t j = 0; j <= res; ++j )
+				{
+					double x = plotX(j + (res + 1)*i,0);
+					double v = plotX(j + (res + 1)*i,1);
+					double f = plotf(j+(res+1)*i) - 0.39894228040143267793994 * std::exp(-0.5 * v * v);
+					fstr << x << " " << v
+				    	 << " " << f << std::endl;
+				}
+				fstr << "\n";
+			}
+		}
 
 		xv.col(0) += dt*xv.col(1);             // Move particles
 		xv.col(0) -= L * floor(xv.col(0) / L); // Set to periodic positions.
