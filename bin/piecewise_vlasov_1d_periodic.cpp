@@ -29,7 +29,7 @@
 #include <vlasovius/misc/periodic_poisson_1d.h>
 
 
-constexpr size_t order = 4;
+constexpr size_t order = 1;
 using wendland_t       = vlasovius::kernels::wendland<1,order>;
 using kernel_t         = vlasovius::kernels::tensorised_kernel<wendland_t>;
 using interpolator_t   = vlasovius::interpolators::piecewise_interpolator<kernel_t>;
@@ -44,12 +44,12 @@ int main()
 	//double L = 2*3.14159265358979323846 / 0.3; // Bump on tail
 
 	wendland_t W;
-	arma::rowvec sigma { 6, 3 };
+	arma::rowvec sigma { 2, 1 };
 	kernel_t   K ( W, sigma );
 	kernel_t   Kx( W, arma::rowvec { sigma(0) } );
 
 
-	size_t Nx = 512, Nv = 1024;
+	size_t Nx = 256, Nv = 512;
 	std::cout << "Number of particles: " << Nx*Nv << ".\n";
 
 	size_t num_threads = omp_get_max_threads();
@@ -62,7 +62,7 @@ int main()
 	arma::vec rho( rho_points.size() );
 	vlasovius::geometry::kd_tree rho_tree(rho_points);
 
-	double vmax = 8;
+	double vmax = 12;
 
 	// Initialise xv.
 	xv.set_size( Nx*Nv,2 );
@@ -78,8 +78,17 @@ int main()
 		constexpr double alpha = 0.01;
 		constexpr double k     = 0.5;
 		// Linear Landau damping:
+		/*
 		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
-				* std::exp(-0.5 * v * v);
+					* std::exp(-0.5 * v * v);
+		*/
+
+		// Two Stream Instability:
+
+		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
+						* v * v * std::exp(-0.5 * v * v);
+
+
 		/*
 		// Bump on tail benchmark:
 		constexpr double alpha = 0.04;
@@ -106,7 +115,7 @@ int main()
 		}
 
 	size_t count = 0;
-	double t = 0, T = 50.25, dt = 1./16.;
+	double t = 0, T = 200.25, dt = 1./16.;
 	std::ofstream str("E.txt");
 	while ( t < T )
 	{
@@ -126,7 +135,8 @@ int main()
 				{
 					double x = plotX(j + (res + 1)*i,0);
 					double v = plotX(j + (res + 1)*i,1);
-					double f = plotf(j+(res+1)*i) - 0.39894228040143267793994 * std::exp(-0.5 * v * v);
+					double f = plotf(j+(res+1)*i);
+					//double f = plotf(j+(res+1)*i) - 0.39894228040143267793994 * std::exp(-0.5 * v * v);
 					fstr << x << " " << v
 				    	 << " " << f << std::endl;
 				}
