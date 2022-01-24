@@ -50,8 +50,8 @@ int main()
 	kernel_t   K ( W, sigma );
 	kernel_t   Kx( W, arma::rowvec { sigma(0) } );
 
-	size_t Nx_ion = 128, Nv_ion = 512;
-	size_t Nx_electron = 128, Nv_electron = 512;
+	size_t Nx_ion = 128, Nv_ion = 256;
+	size_t Nx_electron = 512, Nv_electron = 512;
 	std::cout << "Number of ion-particles: " << Nx_ion*Nv_ion << ".\n";
 	std::cout << "Number of ion-particles: " << Nx_electron*Nv_electron << ".\n";
 
@@ -118,7 +118,7 @@ int main()
 		}
 
 	size_t count = 0;
-	double t = 0, T = 30.25, dt = 1./8.;
+	double t = 0, T = 30.25, dt = 1./32.;
 	std::ofstream str("E.txt");
 	vlasovius::misc::stopwatch global_clock;
 	while ( t < T )
@@ -126,7 +126,7 @@ int main()
 		std::cout << "t = " << t << ". " << std::endl;
 		vlasovius::misc::stopwatch clock;
 
-		if ( count++ % 8 == 0 )
+		if ( count++ % 32 == 0 )
 		{
 			interpolator_t sfx_ion { K, xv_ion, f_ion, min_per_box, tikhonov_mu, num_threads };
 			interpolator_t sfx_electron { K, xv_electron, f_electron, min_per_box, tikhonov_mu, num_threads };
@@ -146,7 +146,7 @@ int main()
 				f_ion_str << "\n";
 			}
 			plotf = sfx_electron(plotX);
-			std::ofstream f_electron_str( "f_ion_" + std::to_string(t) + ".txt" );
+			std::ofstream f_electron_str( "f_electron_" + std::to_string(t) + ".txt" );
 			for ( size_t i = 0; i <= res; ++i )
 			{
 				for ( size_t j = 0; j <= res; ++j )
@@ -256,7 +256,7 @@ int main()
 		for ( size_t i = 0; i < xv_ion.n_rows; ++i )
 		{
 			double E = poisson.E(xv_ion(i,0));
-			xv_ion(i,1) += -dt*E;
+			xv_ion(i,1) += (1.0 / Mr) * dt*E;
 			max_e = std::max(max_e,std::abs(E));
 		}
 		for ( size_t i = 0; i < xv_electron.n_rows; ++i )
