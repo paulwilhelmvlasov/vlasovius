@@ -50,13 +50,12 @@ int main()
 	kernel_t   K ( W, sigma );
 	kernel_t   Kx( W, arma::rowvec { sigma(0) } );
 
-	size_t Nx_ion = 128, Nv_ion = 256;
+	size_t Nx_ion = 128, Nv_ion = 1024;
 	size_t Nx_electron = 512, Nv_electron = 512;
 	std::cout << "Number of ion-particles: " << Nx_ion*Nv_ion << ".\n";
 	std::cout << "Number of ion-particles: " << Nx_electron*Nv_electron << ".\n";
 
 	size_t num_threads = omp_get_max_threads();
-
 
 	arma::mat xv_ion;
 	arma::vec f_ion;
@@ -72,16 +71,32 @@ int main()
 	vlasovius::geometry::kd_tree rho_tree(rho_points);
 
 	// Initialise Ion-distribution:
+	size_t b1 = size_t(Nv_ion / 3.0);
+	size_t b2 = size_t(Nv_ion * 2.0 / 3.0);
+	double v_break = 0.1;
+	double v1 = -v_break;
+	double v2 = v_break;
 	xv_ion.set_size( Nx_ion*Nv_ion,2 );
 	f_ion.resize( Nx_ion*Nv_ion );
 	for ( size_t i = 0; i < Nx_ion; ++i )
 	for ( size_t j = 0; j < Nv_ion; ++j )
 	{
 		double x = (i+0.5) * (L/Nx_ion);
-		double v = -vmax + j*(2*vmax/(Nv_ion-1));
+		double v = 0;
+		if(j < b1){
+			v = -vmax + j*((v1+vmax)/double(b1-1));
+		} else if (j < b2){
+			v = v1 + (j - b1)*((v2-v1)/double(b2-b1-1));
+		} else {
+			v = v2 + (j-b2)*((vmax-v2)/double(Nv_ion-b2-1));
+		}
 
 		xv_ion( j + Nv_ion*i, 0 ) = x;
 		xv_ion( j + Nv_ion*i, 1 ) = v;
+
+		if(v > 8 || v < -8){
+			std::cout << v << " " << j << std::endl;
+		}
 
 		f_ion( j + Nv_ion*i ) = std::sqrt(Mr / (2.0 * M_PI)) * std::exp(-0.5 * Mr * v * v);
 	}
@@ -100,10 +115,15 @@ int main()
 
 		f_electron( j + Nv_electron*i ) = std::sqrt(1.0 / (2.0 * M_PI))
 				* std::exp(-0.5 * (v - Ue) * (v - Ue) )
-				* 0.01 * (std::sin(x) + std::sin(0.5 * x)
-						+ std::sin(0.1 * x) + std::sin(0.15 * x)
-						+ std::sin(0.2 * x) + std::cos(0.25 * x)
-						+ std::cos(0.3 * x) + std::cos(0.35 * x));
+				* 0.01 * (std::sin(x)
+//						+ std::sin(0.5 * x)
+//						+ std::sin(0.1 * x)
+//						+ std::sin(0.15 * x)
+//						+ std::sin(0.2 * x)
+//						+ std::cos(0.25 * x)
+//						+ std::cos(0.3 * x)
+//						+ std::cos(0.35 * x)
+						);
 	}
 
 	size_t res = 200;
