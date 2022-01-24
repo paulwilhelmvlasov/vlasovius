@@ -29,7 +29,7 @@
 #include <vlasovius/misc/periodic_poisson_1d.h>
 
 
-constexpr size_t order = 4;
+constexpr size_t order = 2;
 using wendland_t       = vlasovius::kernels::wendland<1,order>;
 using kernel_t         = vlasovius::kernels::tensorised_kernel<wendland_t>;
 using interpolator_t   = vlasovius::interpolators::piecewise_interpolator<kernel_t>;
@@ -44,12 +44,12 @@ int main()
 	//double L = 2*3.14159265358979323846 / 0.3; // Bump on tail
 
 	wendland_t W;
-	arma::rowvec sigma { 1, 1 };
+	arma::rowvec sigma { 4, 2 };
 	kernel_t   K ( W, sigma );
 	kernel_t   Kx( W, arma::rowvec { sigma(0) } );
 
 
-	size_t Nx = 512, Nv = 2048;
+	size_t Nx = 128, Nv = 512;
 	std::cout << "Number of particles: " << Nx*Nv << ".\n";
 
 	size_t num_threads = omp_get_max_threads();
@@ -62,7 +62,7 @@ int main()
 	arma::vec rho( rho_points.size() );
 	vlasovius::geometry::kd_tree rho_tree(rho_points);
 
-	double vmax = 6;
+	double vmax = 10;
 
 	// Initialise xv.
 	xv.set_size( Nx*Nv,2 );
@@ -78,19 +78,20 @@ int main()
 		constexpr double alpha = 0.01;
 		constexpr double k     = 0.5;
 		// Linear Landau damping:
-		/*
+
 		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
 					* std::exp(-0.5 * v * v);
-		*/
+
 
 		// Two Stream Instability:
-
+		/*
 		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
 						* v * v * std::exp(-0.5 * v * v);
+		*/
 
 
-		/*
 		// Bump on tail benchmark:
+		/*
 		constexpr double alpha = 0.04;
 		constexpr double k     = 0.3;
 		constexpr double np = 0.9;
@@ -115,15 +116,16 @@ int main()
 		}
 
 	size_t count = 0;
-	double t = 0, T = 200.25, dt = 1./32.;
+	double t = 0, T = 30.25, dt = 1./8.;
 	std::ofstream str("E.txt");
+	vlasovius::misc::stopwatch global_clock;
 	while ( t < T )
 	{
 		std::cout << "t = " << t << ". " << std::endl;
 		vlasovius::misc::stopwatch clock;
 
 		if ( t + dt > T ) dt = T - t;
-
+		/*
 		if ( count++ % 16 == 0 )
 		{
 			interpolator_t sfx { K, xv, f, min_per_box, tikhonov_mu, num_threads };
@@ -144,6 +146,7 @@ int main()
 				fstr << "\n";
 			}
 		}
+		*/
 
 		xv.col(0) += dt*xv.col(1);             // Move particles
 		xv.col(0) -= L * floor(xv.col(0) / L); // Set to periodic positions.
@@ -196,12 +199,12 @@ int main()
 		std::cout << "Max-norm of E: " << max_e << "." << std::endl;
 
 
-
-
 		double elapsed = clock.elapsed();
 		std::cout << "Time for needed for time-step: " << elapsed << ".\n";
 		std::cout << "---------------------------------------\n";
 
 		t += dt;
 	}
+	double global_elapsed = global_clock.elapsed();
+	std::cout << "Total comp time: " << global_elapsed << "s." << std::endl;
 }

@@ -212,7 +212,7 @@ void xv_kernel<k1,k2>::mul( size_t dim, size_t n, size_t m, size_t nrhs,
 
 int main()
 {
-	constexpr size_t order = 2;
+	constexpr size_t order = 4;
 	using kernel_t        = vlasovius::xv_kernel<order,4>;
 	using interpolator_t  = vlasovius::interpolators::direct_interpolator<kernel_t>;
 	using poisson_t       = vlasovius::misc::poisson_gedoens::periodic_poisson_1d<8>;
@@ -220,9 +220,9 @@ int main()
 	using wendland_t = vlasovius::kernels::wendland<1,4>;
 	wendland_t W;
 
-	double L = 4*3.14159265358979323846, sigma_x  = 3, sigma_v = 1;
-	double mu = 1e-10;
-	double vmax = 6;
+	double L = 4*3.14159265358979323846, sigma_x  = 2, sigma_v = 1;
+	double mu = 1e-12;
+	double vmax = 8;
 	kernel_t K( sigma_x, sigma_v, L );
 
 
@@ -263,7 +263,7 @@ int main()
 		}
 
 	// Initialise xv.
-	size_t Nx = 32, Nv = 64;
+	size_t Nx = 64, Nv = 256;
 	xv.set_size( Nx*Nv,2 );
 	f.resize( Nx*Nv );
 	for ( size_t i = 0; i < Nx; ++i )
@@ -275,17 +275,41 @@ int main()
 		xv( j + Nv*i, 0 ) = x;
 		xv( j + Nv*i, 1 ) = v;
 		constexpr double alpha = 0.01;
-		constexpr double K     = 0.5;
-		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1 + alpha*std::cos(K*x) ) * std::exp( -v*v/2 );
+		constexpr double k     = 0.5;
+		// Linear Landau damping:
+		/*
+		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
+					* std::exp(-0.5 * v * v);
+		*/
+
+		// Two Stream Instability:
+
+		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
+						* v * v * std::exp(-0.5 * v * v);
+
+
+		/*
+		// Bump on tail benchmark:
+		constexpr double alpha = 0.04;
+		constexpr double k     = 0.3;
+		constexpr double np = 0.9;
+		constexpr double nb = 0.2;
+		constexpr double vb = 4.5;
+		constexpr double vt = 0.5;
+		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
+				* (np * std::exp( -0.5 * v*v )
+				+  nb * std::exp( -0.5 * (v-vb)*(v-vb) / (vt * vt)) );
+		*/
+
 	}
 
 	size_t count = 0;
-	double t = 0, T = 50, dt = 1./8.;
+	double t = 0, T = 50.25, dt = 1./4.;
 	std::ofstream str("E.txt");
 	while ( t < T )
 	{
 		std::cout << "t = " << t << ". " << std::endl;
-
+		/*
 		if ( count++ % 8 == 0 )
 		{
 			interpolator_t sfx { K, xv, f, mu, num_threads };
@@ -297,14 +321,15 @@ int main()
 				{
 					double x = plotX(j + (res + 1)*i,0);
 					double v = plotX(j + (res + 1)*i,1);
-					double f = plotf(j+(res+1)*i) - 0.39894228040143267793994 * std::exp(-0.5 * v * v);
+					double f = plotf(j+(res+1)*i);
+					//double f = plotf(j+(res+1)*i) - 0.39894228040143267793994 * std::exp(-0.5 * v * v);
 					fstr << x << " " << v
 				    	 << " " << f << std::endl;
 				}
 				fstr << "\n";
 			}
 		}
-
+	   */
 
 		vlasovius::misc::stopwatch clock;
 		for ( size_t stage = 0; stage < 4; ++stage )
