@@ -41,16 +41,21 @@ int main()
 	constexpr size_t min_per_box = 200;
 
 	double L = 40 * 3.14159265358979323846;
-	double vmax = 8;
 	double Mr = 1000;
+	double vmax_electron = 8;
+	double vmax_ion = vmax_electron/(std::sqrt(Mr));
 	double Ue = -2;
 
 	wendland_t W;
-	arma::rowvec sigma { 4, 2 };
-	kernel_t   K ( W, sigma );
-	kernel_t   Kx( W, arma::rowvec { sigma(0) } );
+	arma::rowvec sigma_ion { 2, 1 };
+	kernel_t   K_ion ( W, sigma_ion );
+	kernel_t   Kx_ion( W, arma::rowvec { sigma_ion(0) } );
 
-	size_t Nx_ion = 128, Nv_ion = 1024;
+	arma::rowvec sigma_electron { 2, 1 };
+	kernel_t   K_electron  ( W, sigma_electron );
+	kernel_t   Kx_electron ( W, arma::rowvec { sigma_electron(0) } );
+
+	size_t Nx_ion = 512, Nv_ion = 1024;
 	size_t Nx_electron = 512, Nv_electron = 512;
 	std::cout << "Number of ion-particles: " << Nx_ion*Nv_ion << ".\n";
 	std::cout << "Number of ion-particles: " << Nx_electron*Nv_electron << ".\n";
@@ -73,7 +78,7 @@ int main()
 	// Initialise Ion-distribution:
 	size_t b1 = size_t(Nv_ion / 3.0);
 	size_t b2 = size_t(Nv_ion * 2.0 / 3.0);
-	double v_break = 0.1;
+	double v_break = 0.05;
 	double v1 = -v_break;
 	double v2 = v_break;
 	xv_ion.set_size( Nx_ion*Nv_ion,2 );
@@ -82,21 +87,20 @@ int main()
 	for ( size_t j = 0; j < Nv_ion; ++j )
 	{
 		double x = (i+0.5) * (L/Nx_ion);
+		/*
 		double v = 0;
 		if(j < b1){
-			v = -vmax + j*((v1+vmax)/double(b1-1));
+			v = -vmax_ion + j*((v1+vmax_ion)/double(b1-1));
 		} else if (j < b2){
 			v = v1 + (j - b1)*((v2-v1)/double(b2-b1-1));
 		} else {
-			v = v2 + (j-b2)*((vmax-v2)/double(Nv_ion-b2-1));
+			v = v2 + (j-b2)*((vmax_ion-v2)/double(Nv_ion-b2-1));
 		}
+		*/
+		double v = -vmax_ion + j*(2*vmax_ion/(Nv_electron-1));
 
 		xv_ion( j + Nv_ion*i, 0 ) = x;
 		xv_ion( j + Nv_ion*i, 1 ) = v;
-
-		if(v > 8 || v < -8){
-			std::cout << v << " " << j << std::endl;
-		}
 
 		f_ion( j + Nv_ion*i ) = std::sqrt(Mr / (2.0 * M_PI)) * std::exp(-0.5 * Mr * v * v);
 	}
@@ -108,7 +112,7 @@ int main()
 	for ( size_t j = 0; j < Nv_electron; ++j )
 	{
 		double x = (i+0.5) * (L/Nx_electron);
-		double v = -vmax + j*(2*vmax/(Nv_electron-1));
+		double v = -vmax_electron + j*(2*vmax_electron/(Nv_electron-1));
 
 		xv_electron( j + Nv_electron*i, 0 ) = x;
 		xv_electron( j + Nv_electron*i, 1 ) = v;
@@ -116,29 +120,30 @@ int main()
 		f_electron( j + Nv_electron*i ) = std::sqrt(1.0 / (2.0 * M_PI))
 				* std::exp(-0.5 * (v - Ue) * (v - Ue) )
 				* 0.01 * (std::sin(x)
-//						+ std::sin(0.5 * x)
-//						+ std::sin(0.1 * x)
-//						+ std::sin(0.15 * x)
-//						+ std::sin(0.2 * x)
-//						+ std::cos(0.25 * x)
-//						+ std::cos(0.3 * x)
-//						+ std::cos(0.35 * x)
+						+ std::sin(0.5 * x)
+						+ std::sin(0.1 * x)
+						+ std::sin(0.15 * x)
+						+ std::sin(0.2 * x)
+						+ std::cos(0.25 * x)
+						+ std::cos(0.3 * x)
+						+ std::cos(0.35 * x)
 						);
 	}
 
-	size_t res = 200;
+	double v_plot = 3.0;
+	size_t res = 300;
 	arma::mat plotX( (res + 1)*(res + 1), 2 );
 	arma::vec plotf( (res + 1)*(res + 1));
 	for ( size_t i = 0; i <= res; ++i )
 		for ( size_t j = 0; j <= res; ++j )
 		{
 			plotX(j + (res + 1)*i,0) = L * i/double(res);
-			plotX(j + (res + 1)*i,1) = 2*vmax * j/double(res) - vmax;
+			plotX(j + (res + 1)*i,1) = 2*v_plot * j/double(res) - v_plot;
 			plotf(j + (res + 1)*i) = 0;
 		}
 
 	size_t count = 0;
-	double t = 0, T = 30.25, dt = 1./32.;
+	double t = 0, T = 1000.25, dt = 1./8.;
 	std::ofstream str("E.txt");
 	vlasovius::misc::stopwatch global_clock;
 	while ( t < T )
@@ -148,8 +153,8 @@ int main()
 
 		if ( count++ % 32 == 0 )
 		{
-			interpolator_t sfx_ion { K, xv_ion, f_ion, min_per_box, tikhonov_mu, num_threads };
-			interpolator_t sfx_electron { K, xv_electron, f_electron, min_per_box, tikhonov_mu, num_threads };
+			interpolator_t sfx_ion { K_ion, xv_ion, f_ion, min_per_box, tikhonov_mu, num_threads };
+			interpolator_t sfx_electron { K_electron, xv_electron, f_electron, min_per_box, tikhonov_mu, num_threads };
 
 			plotf = sfx_ion(plotX);
 			std::ofstream f_ion_str( "f_ion_" + std::to_string(t) + ".txt" );
@@ -190,8 +195,8 @@ int main()
 		xv_electron.col(0) -= L * floor(xv_electron.col(0) / L); // Set to periodic positions.
 
 		//Interpolate f_ion and f_electron
-		interpolator_t sfx_ion { K, xv_ion, f_ion, min_per_box, tikhonov_mu, num_threads };
-		interpolator_t sfx_electron { K, xv_electron, f_electron, min_per_box, tikhonov_mu, num_threads };
+		interpolator_t sfx_ion { K_ion, xv_ion, f_ion, min_per_box, tikhonov_mu, num_threads };
+		interpolator_t sfx_electron { K_electron, xv_electron, f_electron, min_per_box, tikhonov_mu, num_threads };
 
 		// Compute rho_ion:
 		rho_ion.fill(0);
@@ -215,14 +220,14 @@ int main()
 				for ( size_t j = 0; j < n; ++j )
 				{
 					double v = X(j,1);
-					coeff(j) = local.coeffs()(j) * sigma(1) *
-							   ( W.integral((v-v_min)/sigma(1)) +
-					             W.integral((v_max-v)/sigma(1)) );
+					coeff(j) = local.coeffs()(j) * sigma_ion(1) *
+							   ( W.integral((v-v_min)/sigma_ion(1)) +
+					             W.integral((v_max-v)/sigma_ion(1)) );
 				}
 
 				arma::rowvec box { x_min, x_max };
 				arma::uvec idx = rho_tree.index_query(box);
-				my_rho(idx) += Kx(rho_points(idx),X)*coeff( arma::span(0,n-1) );
+				my_rho(idx) += Kx_ion(rho_points(idx),X)*coeff( arma::span(0,n-1) );
 			}
 
 			#pragma omp critical
@@ -251,14 +256,14 @@ int main()
 				for ( size_t j = 0; j < n; ++j )
 				{
 					double v = X(j,1);
-					coeff(j) = local.coeffs()(j) * sigma(1) *
-							   ( W.integral((v-v_min)/sigma(1)) +
-				             W.integral((v_max-v)/sigma(1)) );
+					coeff(j) = local.coeffs()(j) * sigma_electron(1) *
+							   ( W.integral((v-v_min)/sigma_electron(1)) +
+				             W.integral((v_max-v)/sigma_electron(1)) );
 				}
 
 				arma::rowvec box { x_min, x_max };
 				arma::uvec idx = rho_tree.index_query(box);
-				my_rho(idx) += Kx(rho_points(idx),X)*coeff( arma::span(0,n-1) );
+				my_rho(idx) += Kx_electron(rho_points(idx),X)*coeff( arma::span(0,n-1) );
 			}
 
 			#pragma omp critical
