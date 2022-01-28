@@ -37,7 +37,6 @@ using poisson_t        = vlasovius::misc::poisson_gedoens::periodic_poisson_1d<8
 
 int main()
 {
-	constexpr double tikhonov_mu { 1e-10 };
 	constexpr size_t min_per_box = 200;
 
 	double L = 40 * 3.14159265358979323846;
@@ -47,16 +46,18 @@ int main()
 	double Ue = -2;
 
 	wendland_t W;
-	arma::rowvec sigma_ion { 2, 1 };
+	arma::rowvec sigma_ion { 10, 2};
 	kernel_t   K_ion ( W, sigma_ion );
 	kernel_t   Kx_ion( W, arma::rowvec { sigma_ion(0) } );
+	constexpr double tikhonov_mu_ion { 1e-10 };
 
-	arma::rowvec sigma_electron { 2, 1 };
+	arma::rowvec sigma_electron { 10, 2 };
 	kernel_t   K_electron  ( W, sigma_electron );
 	kernel_t   Kx_electron ( W, arma::rowvec { sigma_electron(0) } );
+	constexpr double tikhonov_mu_electron { 1e-10 };
 
-	size_t Nx_ion = 512, Nv_ion = 1024;
-	size_t Nx_electron = 512, Nv_electron = 512;
+	size_t Nx_ion = 256, Nv_ion = 512;
+	size_t Nx_electron = 1024, Nv_electron = 1024;
 	std::cout << "Number of ion-particles: " << Nx_ion*Nv_ion << ".\n";
 	std::cout << "Number of ion-particles: " << Nx_electron*Nv_electron << ".\n";
 
@@ -97,7 +98,7 @@ int main()
 			v = v2 + (j-b2)*((vmax_ion-v2)/double(Nv_ion-b2-1));
 		}
 		*/
-		double v = -vmax_ion + j*(2*vmax_ion/(Nv_electron-1));
+		double v = -vmax_ion + j*(2*vmax_ion/(Nv_ion-1));
 
 		xv_ion( j + Nv_ion*i, 0 ) = x;
 		xv_ion( j + Nv_ion*i, 1 ) = v;
@@ -119,7 +120,7 @@ int main()
 
 		f_electron( j + Nv_electron*i ) = std::sqrt(1.0 / (2.0 * M_PI))
 				* std::exp(-0.5 * (v - Ue) * (v - Ue) )
-				* 0.01 * (std::sin(x)
+				* (1 + 0.01 * (std::sin(x)
 						+ std::sin(0.5 * x)
 						+ std::sin(0.1 * x)
 						+ std::sin(0.15 * x)
@@ -127,7 +128,7 @@ int main()
 						+ std::cos(0.25 * x)
 						+ std::cos(0.3 * x)
 						+ std::cos(0.35 * x)
-						);
+						));
 	}
 
 	double v_plot = 3.0;
@@ -143,7 +144,7 @@ int main()
 		}
 
 	size_t count = 0;
-	double t = 0, T = 1000.25, dt = 1./8.;
+	double t = 0, T = 1000.25, dt = 1./16.;
 	std::ofstream str("E.txt");
 	vlasovius::misc::stopwatch global_clock;
 	while ( t < T )
@@ -151,10 +152,10 @@ int main()
 		std::cout << "t = " << t << ". " << std::endl;
 		vlasovius::misc::stopwatch clock;
 
-		if ( count++ % 32 == 0 )
+		if ( count++ % 16 == 0 )
 		{
-			interpolator_t sfx_ion { K_ion, xv_ion, f_ion, min_per_box, tikhonov_mu, num_threads };
-			interpolator_t sfx_electron { K_electron, xv_electron, f_electron, min_per_box, tikhonov_mu, num_threads };
+			interpolator_t sfx_ion { K_ion, xv_ion, f_ion, min_per_box, tikhonov_mu_ion, num_threads };
+			interpolator_t sfx_electron { K_electron, xv_electron, f_electron, min_per_box, tikhonov_mu_electron, num_threads };
 
 			plotf = sfx_ion(plotX);
 			std::ofstream f_ion_str( "f_ion_" + std::to_string(t) + ".txt" );
@@ -195,8 +196,8 @@ int main()
 		xv_electron.col(0) -= L * floor(xv_electron.col(0) / L); // Set to periodic positions.
 
 		//Interpolate f_ion and f_electron
-		interpolator_t sfx_ion { K_ion, xv_ion, f_ion, min_per_box, tikhonov_mu, num_threads };
-		interpolator_t sfx_electron { K_electron, xv_electron, f_electron, min_per_box, tikhonov_mu, num_threads };
+		interpolator_t sfx_ion { K_ion, xv_ion, f_ion, min_per_box, tikhonov_mu_ion, num_threads };
+		interpolator_t sfx_electron { K_electron, xv_electron, f_electron, min_per_box, tikhonov_mu_electron, num_threads };
 
 		// Compute rho_ion:
 		rho_ion.fill(0);
