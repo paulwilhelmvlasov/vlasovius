@@ -131,16 +131,30 @@ int main()
 						));
 	}
 
-	double v_plot = 3.0;
-	size_t res = 300;
-	arma::mat plotX( (res + 1)*(res + 1), 2 );
-	arma::vec plotf( (res + 1)*(res + 1));
-	for ( size_t i = 0; i <= res; ++i )
-		for ( size_t j = 0; j <= res; ++j )
+
+	// Prepare for plotting:
+	size_t res_ion = 200;
+	double v_plot_ion = 0.3;
+	arma::mat plotX_ion( (res_ion + 1)*(res_ion + 1), 2 );
+	arma::vec plotf_ion( (res_ion + 1)*(res_ion + 1));
+	for ( size_t i = 0; i <= res_ion; ++i )
+		for ( size_t j = 0; j <= res_ion; ++j )
 		{
-			plotX(j + (res + 1)*i,0) = L * i/double(res);
-			plotX(j + (res + 1)*i,1) = 2*v_plot * j/double(res) - v_plot;
-			plotf(j + (res + 1)*i) = 0;
+			plotX_ion(j + (res_ion + 1)*i,0) = L * i/double(res_ion);
+			plotX_ion(j + (res_ion + 1)*i,1) = 2*v_plot_ion * j/double(res_ion) - v_plot_ion;
+			plotf_ion(j + (res_ion + 1)*i) = 0;
+		}
+
+	size_t res_electron = 200;
+	double v_plot_electron = 8.0;
+	arma::mat plotX_electron( (res_electron + 1)*(res_electron + 1), 2 );
+	arma::vec plotf_electron( (res_electron + 1)*(res_electron + 1));
+	for ( size_t i = 0; i <= res_electron; ++i )
+		for ( size_t j = 0; j <= res_electron; ++j )
+		{
+			plotX_electron(j + (res_electron + 1)*i,0) = L * i/double(res_electron);
+			plotX_electron(j + (res_electron + 1)*i,1) = 2*v_plot_electron * j/double(res_electron) - v_plot_electron;
+			plotf_electron(j + (res_electron + 1)*i) = 0;
 		}
 
 	size_t count = 0;
@@ -157,29 +171,29 @@ int main()
 			interpolator_t sfx_ion { K_ion, xv_ion, f_ion, min_per_box, tikhonov_mu_ion, num_threads };
 			interpolator_t sfx_electron { K_electron, xv_electron, f_electron, min_per_box, tikhonov_mu_electron, num_threads };
 
-			plotf = sfx_ion(plotX);
+			plotf_ion = sfx_ion(plotX_ion);
 			std::ofstream f_ion_str( "f_ion_" + std::to_string(t) + ".txt" );
-			for ( size_t i = 0; i <= res; ++i )
+			for ( size_t i = 0; i <= res_ion; ++i )
 			{
-				for ( size_t j = 0; j <= res; ++j )
+				for ( size_t j = 0; j <= res_ion; ++j )
 				{
-					double x = plotX(j + (res + 1)*i,0);
-					double v = plotX(j + (res + 1)*i,1);
-					double f = plotf(j + (res+1)*i);
+					double x = plotX_ion(j + (res_ion + 1)*i,0);
+					double v = plotX_ion(j + (res_ion + 1)*i,1);
+					double f = plotf_ion(j + (res_ion+1)*i);
 
 					f_ion_str << x << " " << v << " " << f << std::endl;
 				}
 				f_ion_str << "\n";
 			}
-			plotf = sfx_electron(plotX);
+			plotf_electron = sfx_electron(plotX_electron);
 			std::ofstream f_electron_str( "f_electron_" + std::to_string(t) + ".txt" );
-			for ( size_t i = 0; i <= res; ++i )
+			for ( size_t i = 0; i <= res_electron; ++i )
 			{
-				for ( size_t j = 0; j <= res; ++j )
+				for ( size_t j = 0; j <= res_electron; ++j )
 				{
-					double x = plotX(j + (res + 1)*i,0);
-					double v = plotX(j + (res + 1)*i,1);
-					double f = plotf(j + (res+1)*i);
+					double x = plotX_electron(j + (res_electron + 1)*i,0);
+					double v = plotX_electron(j + (res_electron + 1)*i,1);
+					double f = plotf_electron(j + (res_electron+1)*i);
 
 					f_electron_str << x << " " << v << " " << f << std::endl;
 				}
