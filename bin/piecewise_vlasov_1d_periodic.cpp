@@ -29,7 +29,7 @@
 #include <vlasovius/misc/periodic_poisson_1d.h>
 
 
-constexpr size_t order = 1;
+constexpr size_t order = 2;
 using wendland_t       = vlasovius::kernels::wendland<1,order>;
 using kernel_t         = vlasovius::kernels::tensorised_kernel<wendland_t>;
 using interpolator_t   = vlasovius::interpolators::piecewise_interpolator<kernel_t>;
@@ -37,13 +37,13 @@ using poisson_t        = vlasovius::misc::poisson_gedoens::periodic_poisson_1d<8
 
 int main()
 {
-	constexpr double tikhonov_mu { 0 };
+	constexpr double tikhonov_mu { 1e-10 };
 	constexpr size_t min_per_box = 200;
 
-	double L = 4*3.14159265358979323846;
+	double L = 2*3.14159265358979323846 / 0.3;
 
 	wendland_t W;
-	arma::rowvec sigma { L/2, 5 };
+	arma::rowvec sigma { 6, 3 };
 	kernel_t   K ( W, sigma );
 	kernel_t   Kx( W, arma::rowvec { sigma(0) } );
 
@@ -68,13 +68,19 @@ int main()
 	for ( size_t j = 0; j < Nv; ++j )
 	{
 		double x = (i+0.5) * (L/Nx);
-		double v = -5 + j*(10./(Nv-1));
+		double v = -8 + j*(16./(Nv-1));
 
 		xv( j + Nv*i, 0 ) = x;
 		xv( j + Nv*i, 1 ) = v;
-		constexpr double alpha = 0.01;
-		constexpr double k     = 0.5;
-		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) ) * std::exp( -v*v/2. );
+		constexpr double alpha = 0.04;
+		constexpr double k     = 0.3;
+		constexpr double np = 0.9;
+		constexpr double nb = 0.2;
+		constexpr double vb = 4.5;
+		constexpr double vt = 0.5;
+		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
+				* (np * std::exp( -0.5 * v*v )
+				+  nb * std::exp( -0.5 * (v-vb)*(v-vb) / (vt * vt)) );
 	}
 
 	arma::mat plotX( 401*401, 2 );
@@ -83,12 +89,12 @@ int main()
 		for ( size_t j = 0; j <= 400; ++j )
 		{
 			plotX(j + 401*i,0) = L * i/400.;
-			plotX(j + 401*i,1) = 8.0 * j/400. - 4.0;
+			plotX(j + 401*i,1) = 16.0 * j/400. - 8.0;
 			plotf(j + 401*i) = 0;
 		}
 
 	size_t count = 0;
-	double t = 0, T = 100, dt = 1./16.;
+	double t = 0, T = 2000, dt = 1./16.;
 	std::ofstream str("E.txt");
 	while ( t < T )
 	{
