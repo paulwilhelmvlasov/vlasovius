@@ -37,19 +37,19 @@ using poisson_t        = vlasovius::misc::poisson_gedoens::periodic_poisson_1d<8
 
 int main()
 {
-	constexpr double tikhonov_mu { 1e-10 };
-	constexpr size_t min_per_box = 200;
+	constexpr double tikhonov_mu { 1e-12 };
+	constexpr size_t min_per_box = 100;
 
 	double L = 4 * 3.14159265358979323846;
 	//double L = 2*3.14159265358979323846 / 0.3; // Bump on tail
 
 	wendland_t W;
-	arma::rowvec sigma { 4, 2 };
+	arma::rowvec sigma { 3, 1 };
 	kernel_t   K ( W, sigma );
 	kernel_t   Kx( W, arma::rowvec { sigma(0) } );
 
 
-	size_t Nx = 128, Nv = 512;
+	size_t Nx = 64, Nv = 128;
 	std::cout << "Number of particles: " << Nx*Nv << ".\n";
 
 	size_t num_threads = omp_get_max_threads();
@@ -57,12 +57,13 @@ int main()
 	arma::mat xv;
 	arma::vec f;
 
-	poisson_t poisson(0,L,256);
+	size_t N_poisson = 256;
+	poisson_t poisson(0,L,N_poisson);
 	arma::vec rho_points = poisson.quadrature_nodes();
 	arma::vec rho( rho_points.size() );
 	vlasovius::geometry::kd_tree rho_tree(rho_points);
 
-	double vmax = 10;
+	double vmax = 6;
 
 	// Initialise xv.
 	xv.set_size( Nx*Nv,2 );
@@ -104,7 +105,9 @@ int main()
 		*/
 	}
 
-	size_t res = 200;
+	size_t res = 300;
+	double hx_plot = L / res;
+	double hv_plot = 2.0 * vmax / res;
 	arma::mat plotX( (res + 1)*(res + 1), 2 );
 	arma::vec plotf( (res + 1)*(res + 1));
 	for ( size_t i = 0; i <= res; ++i )
@@ -116,37 +119,97 @@ int main()
 		}
 
 	size_t count = 0;
-	double t = 0, T = 30.25, dt = 1./8.;
-	std::ofstream str("E.txt");
-	vlasovius::misc::stopwatch global_clock;
+	size_t timeStepCounter = 0;
+	double totalTime = 0;
+	double t = 0, T = 50.25, dt = 1./16.;
+	std::ofstream e_amp_str("E.txt");
+	std::ofstream e_l2_str("E_l2.txt");
+	//std::ofstream str_f_max_err("f_max_error.txt");
+	//std::ofstream str_f_l2_err("f_l2_error.txt");
 	while ( t < T )
 	{
 		std::cout << "t = " << t << ". " << std::endl;
 		vlasovius::misc::stopwatch clock;
 
 		if ( t + dt > T ) dt = T - t;
-		/*
-		if ( count++ % 16 == 0 )
+
+
+		if ( count++ % (10*16) == 0 )
 		{
 			interpolator_t sfx { K, xv, f, min_per_box, tikhonov_mu, num_threads };
 			plotf = sfx(plotX);
 			std::ofstream fstr( "f_" + std::to_string(t) + ".txt" );
+			/*
+			std::ofstream coverBoxes_str("coverBoxes_" + std::to_string(t) + ".txt" );
+			arma::mat coverBoxes = sfx.cover;
+			for(size_t i = 0; i < coverBoxes.n_rows; i++)
+			{
+				coverBoxes_str << "\\draw (";
+				if(coverBoxes(i,0) < -100){
+					coverBoxes_str << -100;
+				}else if(coverBoxes(i,0) > 100){
+					coverBoxes_str << 100;
+				}else{
+					coverBoxes_str << coverBoxes(i,0);
+				}
+				coverBoxes_str << ", ";
+				if(coverBoxes(i,1) < -100){
+					coverBoxes_str << -100;
+				}else if(coverBoxes(i,1) > 100){
+					coverBoxes_str << 100;
+				}else{
+					coverBoxes_str << coverBoxes(i,1);
+				}
+				coverBoxes_str << ") rectangle (";
+				if(coverBoxes(i,2) < -100){
+					coverBoxes_str << -100;
+				}else if(coverBoxes(i,2) > 100){
+					coverBoxes_str << 100;
+				}else{
+					coverBoxes_str << coverBoxes(i,2);
+				}
+				coverBoxes_str << ", ";
+				if(coverBoxes(i,3) < -100){
+					coverBoxes_str << -100;
+				}else if(coverBoxes(i,3) > 100){
+					coverBoxes_str << 100;
+				}else{
+					coverBoxes_str << coverBoxes(i,3);
+				}
+				coverBoxes_str << ");" << std::endl;
+			}
+			*/
+			//std::ifstream f_exact_str("../../res=4096x8192_plotres=400/f_"+ std::to_string(t) + ".txt" );
+			//double f_max_error = 0;
+			//double f_l2_error = 0;
+
 			for ( size_t i = 0; i <= res; ++i )
 			{
 				for ( size_t j = 0; j <= res; ++j )
 				{
 					double x = plotX(j + (res + 1)*i,0);
 					double v = plotX(j + (res + 1)*i,1);
-					double f = plotf(j+(res+1)*i);
+					//double f = plotf(j + (res+1)*i);
 
-					//double f = plotf(j+(res+1)*i) - 0.39894228040143267793994 * std::exp(-0.5 * v * v);
-					fstr << x << " " << v
-				    	 << " " << f << std::endl;
+					double f = plotf(j+(res+1)*i) - 0.39894228040143267793994 * std::exp(-0.5 * v * v);
+					fstr << x << " " << v << " " << f << std::endl;
+
+				//	double f_exact = 0;
+				//	f_exact_str >> x >> v >> f_exact;
+				//	f_max_error = std::max(std::abs(f - f_exact), f_max_error);
+				//	f_l2_error += (f - f_exact)*(f - f_exact);
+
 				}
 				fstr << "\n";
+				//f_exact_str.ignore();
 			}
+
+			//str_f_max_err << t << " " << f_max_error << std::endl;
+			//str_f_l2_err << t << " " << std::sqrt(hx_plot * hv_plot * f_l2_error) << std::endl;
+
 		}
-		*/
+
+
 
 		xv.col(0) += dt*xv.col(1);             // Move particles
 		xv.col(0) -= L * floor(xv.col(0) / L); // Set to periodic positions.
@@ -188,23 +251,31 @@ int main()
 			rho -= my_rho;
 		}
 
-		poisson.update_rho( rho ); double max_e = 0;
+		poisson.update_rho( rho );
+		double max_e = 0;
+		double l2_e = 0;
 		for ( size_t i = 0; i < xv.n_rows; ++i )
 		{
 			double E = poisson.E(xv(i,0));
 			xv(i,1) += -dt*E;
 			max_e = std::max(max_e,std::abs(E));
+			l2_e += (std::abs(E)*std::abs(E));
 		}
-		str << t << " " << max_e  << std::endl;
+
+		l2_e *= (L / N_poisson);
+		e_amp_str << t << " " << max_e  << std::endl;
+		e_l2_str << t << " " << l2_e  << std::endl;
 		std::cout << "Max-norm of E: " << max_e << "." << std::endl;
 
 
 		double elapsed = clock.elapsed();
+		timeStepCounter++;
+		totalTime += elapsed;
 		std::cout << "Time for needed for time-step: " << elapsed << ".\n";
 		std::cout << "---------------------------------------\n";
 
 		t += dt;
 	}
-	double global_elapsed = global_clock.elapsed();
-	std::cout << "Total comp time: " << global_elapsed << "s." << std::endl;
+	std::cout << "Total simulation time: " << totalTime << std::endl;
+	std::cout << "Average time for a time-step: " << totalTime / timeStepCounter << std::endl;
 }

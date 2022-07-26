@@ -16,6 +16,7 @@
  * You should have received a copy of the GNU General Public License along with
  * vlasovius; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
+
 #ifndef VLASOVIUS_GEOMETRY_KD_TREE_H
 #define VLASOVIUS_GEOMETRY_KD_TREE_H
 

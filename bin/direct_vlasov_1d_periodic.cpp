@@ -212,17 +212,17 @@ void xv_kernel<k1,k2>::mul( size_t dim, size_t n, size_t m, size_t nrhs,
 
 int main()
 {
-	constexpr size_t order = 4;
-	using kernel_t        = vlasovius::xv_kernel<order,4>;
+	constexpr size_t order = 2;
+	using kernel_t        = vlasovius::xv_kernel<order,order>;
 	using interpolator_t  = vlasovius::interpolators::direct_interpolator<kernel_t>;
 	using poisson_t       = vlasovius::misc::poisson_gedoens::periodic_poisson_1d<8>;
 
-	using wendland_t = vlasovius::kernels::wendland<1,4>;
+	using wendland_t = vlasovius::kernels::wendland<1,order>;
 	wendland_t W;
 
-	double L = 4*3.14159265358979323846, sigma_x  = 2, sigma_v = 1;
+	double L = 4*3.14159265358979323846, sigma_x  = 1, sigma_v = 0.5;
 	double mu = 1e-12;
-	double vmax = 8;
+	double vmax = 6;
 	kernel_t K( sigma_x, sigma_v, L );
 
 
@@ -251,7 +251,9 @@ int main()
 		}
 	}
 
-	size_t res = 200;
+	size_t res = 400;
+	double hx_plot = L / res;
+	double hv_plot = 2.0 * vmax / res;
 	arma::mat plotX( (res + 1)*(res + 1), 2 );
 	arma::vec plotf( (res + 1)*(res + 1));
 	for ( size_t i = 0; i <= res; ++i )
@@ -263,7 +265,7 @@ int main()
 		}
 
 	// Initialise xv.
-	size_t Nx = 64, Nv = 256;
+	size_t Nx = 128, Nv = 256;
 	xv.set_size( Nx*Nv,2 );
 	f.resize( Nx*Nv );
 	for ( size_t i = 0; i < Nx; ++i )
@@ -277,16 +279,16 @@ int main()
 		constexpr double alpha = 0.01;
 		constexpr double k     = 0.5;
 		// Linear Landau damping:
-		/*
+
 		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
 					* std::exp(-0.5 * v * v);
-		*/
+
 
 		// Two Stream Instability:
-
+/*
 		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
 						* v * v * std::exp(-0.5 * v * v);
-
+*/
 
 		/*
 		// Bump on tail benchmark:
@@ -304,17 +306,24 @@ int main()
 	}
 
 	size_t count = 0;
-	double t = 0, T = 50.25, dt = 1./4.;
-	std::ofstream str("E.txt");
+	double totalTime = 0;
+	double t = 0, T = 30.25, dt = 1./8.;
+	//std::ofstream str("E.txt");
+	//std::ofstream str_f_max_err("f_max_error.txt");
+	//std::ofstream str_f_l2_err("f_l2_error.txt");
 	while ( t < T )
 	{
 		std::cout << "t = " << t << ". " << std::endl;
+
 		/*
 		if ( count++ % 8 == 0 )
 		{
 			interpolator_t sfx { K, xv, f, mu, num_threads };
 			plotf = sfx(plotX);
 			std::ofstream fstr( "f_" + std::to_string(t) + ".txt" );
+			std::ifstream f_exact_str("../../../PW/res=4096x8192_plotres=400/f_"+ std::to_string(t) + ".txt" );
+			double f_max_error = 0;
+			double f_l2_error = 0;
 			for ( size_t i = 0; i <= res; ++i )
 			{
 				for ( size_t j = 0; j <= res; ++j )
@@ -322,14 +331,22 @@ int main()
 					double x = plotX(j + (res + 1)*i,0);
 					double v = plotX(j + (res + 1)*i,1);
 					double f = plotf(j+(res+1)*i);
-					//double f = plotf(j+(res+1)*i) - 0.39894228040143267793994 * std::exp(-0.5 * v * v);
-					fstr << x << " " << v
-				    	 << " " << f << std::endl;
+					fstr << x << " " << v << " " << f << std::endl;
+
+					double f_exact = 0;
+					f_exact_str >> x >> v >> f_exact;
+					f_max_error = std::max(std::abs(f - f_exact), f_max_error);
+					f_l2_error += (f - f_exact)*(f - f_exact);
 				}
 				fstr << "\n";
+				f_exact_str.ignore();
 			}
+
+			str_f_max_err << t << " " << f_max_error << std::endl;
+			str_f_l2_err << t << " " << std::sqrt(hx_plot * hv_plot * f_l2_error) << std::endl;
 		}
-	   */
+		*/
+
 
 		vlasovius::misc::stopwatch clock;
 		for ( size_t stage = 0; stage < 4; ++stage )
@@ -348,12 +365,13 @@ int main()
 
 			for ( size_t i = 0; i < xv_stage.n_rows; ++i )
 				k_xv[stage](i,1) = -poisson.E( xv_stage(i,0) );
-
+/*
 			if ( stage == 0 )
 			{
 				str << t << " " << norm(k_xv[stage].col(1),"inf")  << std::endl;
 				std::cout << "Max-norm of E: " << norm(k_xv[stage].col(1),"inf") << "." << std::endl;
 			}
+*/
  		}
 
 		for ( size_t s = 0; s < 4; ++s )
@@ -361,9 +379,17 @@ int main()
 		t += dt;
 
 		double elapsed = clock.elapsed();
+		count++;
+		totalTime += elapsed;
+
 		std::cout << "Time for needed for time-step: " << elapsed << ".\n";
 		std::cout << "---------------------------------------" << elapsed << ".\n";
 
 		if ( t + dt > T ) dt = T - t;
 	}
+
+	std::cout << "Total simulation time: " << totalTime << std::endl;
+	std::cout << "Average time for a time-step: " << totalTime / count << std::endl;
+
+
 }
