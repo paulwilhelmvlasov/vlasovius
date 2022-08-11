@@ -29,7 +29,7 @@
 #include <vlasovius/misc/periodic_poisson_1d.h>
 
 
-constexpr size_t order = 2;
+constexpr size_t order = 4;
 using wendland_t       = vlasovius::kernels::wendland<1,order>;
 using kernel_t         = vlasovius::kernels::tensorised_kernel<wendland_t>;
 using interpolator_t   = vlasovius::interpolators::piecewise_interpolator<kernel_t>;
@@ -44,12 +44,12 @@ int main()
 	//double L = 2*3.14159265358979323846 / 0.3; // Bump on tail
 
 	wendland_t W;
-	arma::rowvec sigma { 3, 1 };
+	arma::rowvec sigma { 1, 0.5 };
 	kernel_t   K ( W, sigma );
 	kernel_t   Kx( W, arma::rowvec { sigma(0) } );
 
 
-	size_t Nx = 64, Nv = 128;
+	size_t Nx = 256, Nv = 512;
 	std::cout << "Number of particles: " << Nx*Nv << ".\n";
 
 	size_t num_threads = omp_get_max_threads();
@@ -121,11 +121,15 @@ int main()
 	size_t count = 0;
 	size_t timeStepCounter = 0;
 	double totalTime = 0;
-	double t = 0, T = 50.25, dt = 1./16.;
+	double t = 0, T = 30.25, dt = 1./16.;
 	std::ofstream e_amp_str("E.txt");
 	std::ofstream e_l2_str("E_l2.txt");
 	//std::ofstream str_f_max_err("f_max_error.txt");
 	//std::ofstream str_f_l2_err("f_l2_error.txt");
+	std::ofstream str_E_max_err("E_max_error.txt");
+	std::ofstream str_E_l2_err("E_l2_error.txt");
+	std::ofstream str_E_max_rel_err("E_max_rel_error.txt");
+	std::ofstream str_E_l2_rel_err("E_l2_rel_error.txt");
 	while ( t < T )
 	{
 		std::cout << "t = " << t << ". " << std::endl;
@@ -134,11 +138,11 @@ int main()
 		if ( t + dt > T ) dt = T - t;
 
 
-		if ( count++ % (10*16) == 0 )
-		{
-			interpolator_t sfx { K, xv, f, min_per_box, tikhonov_mu, num_threads };
-			plotf = sfx(plotX);
-			std::ofstream fstr( "f_" + std::to_string(t) + ".txt" );
+//		if ( count % (10*16) == 0 )
+//		{
+//			interpolator_t sfx { K, xv, f, min_per_box, tikhonov_mu, num_threads };
+//			plotf = sfx(plotX);
+//			std::ofstream fstr( "f_" + std::to_string(t) + ".txt" );
 			/*
 			std::ofstream coverBoxes_str("coverBoxes_" + std::to_string(t) + ".txt" );
 			arma::mat coverBoxes = sfx.cover;
@@ -183,31 +187,31 @@ int main()
 			//double f_max_error = 0;
 			//double f_l2_error = 0;
 
-			for ( size_t i = 0; i <= res; ++i )
-			{
-				for ( size_t j = 0; j <= res; ++j )
-				{
-					double x = plotX(j + (res + 1)*i,0);
-					double v = plotX(j + (res + 1)*i,1);
+//			for ( size_t i = 0; i <= res; ++i )
+//			{
+//				for ( size_t j = 0; j <= res; ++j )
+//				{
+//					double x = plotX(j + (res + 1)*i,0);
+//					double v = plotX(j + (res + 1)*i,1);
 					//double f = plotf(j + (res+1)*i);
 
-					double f = plotf(j+(res+1)*i) - 0.39894228040143267793994 * std::exp(-0.5 * v * v);
-					fstr << x << " " << v << " " << f << std::endl;
+//					double f = plotf(j+(res+1)*i) - 0.39894228040143267793994 * std::exp(-0.5 * v * v);
+//					fstr << x << " " << v << " " << f << std::endl;
 
 				//	double f_exact = 0;
 				//	f_exact_str >> x >> v >> f_exact;
 				//	f_max_error = std::max(std::abs(f - f_exact), f_max_error);
 				//	f_l2_error += (f - f_exact)*(f - f_exact);
 
-				}
-				fstr << "\n";
+//				}
+//				fstr << "\n";
 				//f_exact_str.ignore();
-			}
+//			}
 
 			//str_f_max_err << t << " " << f_max_error << std::endl;
 			//str_f_l2_err << t << " " << std::sqrt(hx_plot * hv_plot * f_l2_error) << std::endl;
 
-		}
+//		}
 
 
 
@@ -267,6 +271,33 @@ int main()
 		e_l2_str << t << " " << l2_e  << std::endl;
 		std::cout << "Max-norm of E: " << max_e << "." << std::endl;
 
+		if(count % (1*16) == 0)
+		{
+			std::ifstream E_str( "../TestRes/E_" + std::to_string(t) + ".txt" );
+			size_t plot_res_e = 400;
+			double dx = L / plot_res_e;
+			double E_max_error = 0;
+			double E_l2_error = 0;
+			double E_max_exact = 0;
+			for(size_t i = 0; i < plot_res_e; i++)
+			{
+				double x = i * dx;
+				double E_exact = 0;
+				E_str >> x >> E_exact;
+				double E = poisson.E(x);
+
+				double dist = std::abs(E - E_exact);
+				E_max_error = std::max(E_max_error, dist);
+				E_l2_error += (dist*dist);
+				E_max_exact = std::max(E_max_exact, E_exact);
+			}
+			E_l2_error *= dx;
+			str_E_max_err << t << " " << E_max_error << std::endl;
+			str_E_l2_err << t << " " << E_l2_error << std::endl;
+			str_E_max_rel_err << t << " " << E_max_error/E_max_exact << std::endl;
+			str_E_l2_rel_err << t << " " << E_l2_error/E_max_exact << std::endl;
+		}
+
 
 		double elapsed = clock.elapsed();
 		timeStepCounter++;
@@ -275,6 +306,7 @@ int main()
 		std::cout << "---------------------------------------\n";
 
 		t += dt;
+		count++;
 	}
 	std::cout << "Total simulation time: " << totalTime << std::endl;
 	std::cout << "Average time for a time-step: " << totalTime / timeStepCounter << std::endl;

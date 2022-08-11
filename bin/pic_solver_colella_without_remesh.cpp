@@ -36,6 +36,30 @@ double f0( double x, double v ) noexcept
     return fac*(1+alpha*cos(k*x))*exp(-v*v/2);
 }
 
+inline
+double u1(double x, double dx, double dx_inv) noexcept
+{
+	x = std::abs(x);
+	if(x > dx){
+		return 0;
+	}
+
+	return dx_inv * (1 - x*dx_inv);
+}
+
+double rho_eval( double x, const arma::vec& v, double dx, double dx_inv, const arma::vec& W) noexcept
+{
+	arma::vec temp = v;
+	//#pragma omp parallel for
+	for(size_t i = 0; i < temp.n_rows; i++)
+	{
+		temp(i) = u1(temp(i), dx, dx_inv);
+	}
+
+	return arma::dot(W, temp);
+}
+
+
 int main()
 {
     using std::floor;
@@ -44,12 +68,12 @@ int main()
     using poisson_t = vlasovius::misc::poisson_gedoens::periodic_poisson_1d<2>;
 
     const double L  = 4*3.14159265358979323846;
-    const size_t Nx = 32;
-    const size_t Nv = 64;
+    const size_t Nx = 128;
+    const size_t Nv = 256;
     const double v_min = -6;
     const double v_max =  6;
 
-    // Compute derived quatntities
+    // Compute derived quantities
     const double dv = (v_max-v_min)/Nv;
     const double dx = L/Nx;
     const double dx_inv = 1/dx;
@@ -65,9 +89,7 @@ int main()
     k_xv[2].set_size( Nx*Nv, 2 ); 
     k_xv[3].set_size( Nx*Nv, 2 ); 
 
-    size_t num_threads = omp_get_max_threads();
     arma::vec rho(Nx);
-    arma::mat rho_thread( Nx, num_threads );
 
     // Runge--Kutta Butcher tableau.
     constexpr double c_rk4[4][4] = { {   0,   0,  0, 0 },
@@ -75,8 +97,6 @@ int main()
                                      {   0, 0.5,  0, 0 },
                                      {   0,   0,  1, 0 } };
     constexpr double d_rk4[4] = { 1./6., 1./3., 1./3., 1./6. };
-
-
 
     poisson_t poisson(0,L,Nx);
     arma::vec quad_nodes = poisson.quadrature_nodes();
@@ -93,14 +113,10 @@ int main()
          W(j+Nv*i)     = dx*dv*f0(x,v);
     }
 
-    double t = 0, T = 30.25, dt = 1./8.;
+    double t = 0, T = 30, dt = 1./8.;
     double t_total = 0;
     size_t t_step_count = 0;
     std::ofstream str("E.txt");
-    std::ofstream str_E_max_err("E_max_error.txt");
-    std::ofstream str_E_l2_err("E_l2_error.txt");
-    std::ofstream str_E_max_rel_err("E_max_rel_error.txt");
-    std::ofstream str_E_l2_rel_err("E_l2_rel_error.txt");
     while ( t < T )
     {
         std::cout << "t = " << t << ". " << std::endl;
@@ -113,36 +129,19 @@ int main()
 
             k_xv[ stage ].col(0) = xv_stage.col(1);
 
+            for(size_t i = 0; i < Nx*Nv; i++){
+            	double x = xv_stage(i,0);
+            	xv_stage(i,0) = x - L * std::floor(x*L_inv);
+            }
 
             // Compute densities.
-            rho_thread.zeros();
-            rho.zeros();
-
-            // "0th order" PIC:
-            #pragma omp parallel
+            // Using B-Spline of first order.
+			#pragma omp parallel for
+            for(size_t i = 0; i < quad_nodes.size(); i++)
             {
-                size_t threadno = omp_get_thread_num();
-
-                #pragma omp for
-                for ( size_t k = 0; k < Nx*Nv; ++k )
-                {
-                    double x = xv_stage(k,0);
-                    x = x - L*floor(x*L_inv);
-                    size_t i = static_cast<size_t>(x*dx_inv);
-
-                    rho_thread(i,threadno) -= W(k);
-                }
-
-                #pragma omp critical
-                rho += dx_inv*rho_thread.col(threadno);
+            	quad_vals(i) = 1 - rho_eval(quad_nodes(i), xv_stage.col(0), dx, dx_inv, W);
             }
 
-            #pragma omp parallel for
-            for ( size_t k = 0; k < quad_vals.size(); ++k )
-            {
-                double x = quad_nodes(k);
-                quad_vals(k) = rho( static_cast<size_t>(x*dx_inv) );
-            }
 
             // Compute E.
             poisson.update_rho( quad_vals );
@@ -156,33 +155,11 @@ int main()
             {
                 str << t << " " << norm(k_xv[stage].col(1),"inf")  << std::endl;
                 std::cout << "Max-norm of E: " << norm(k_xv[stage].col(1),"inf") << "." << std::endl;
-
-        		if(t_step_count % (1*16) == 0)
-        		{
-        			std::ifstream E_str( "../TestRes/E_" + std::to_string(t) + ".txt" );
-        			size_t plot_res_e = 400;
-        			double dx = L / plot_res_e;
-        			double E_max_error = 0;
-        			double E_l2_error = 0;
-        			double E_max_exact = 0;
-        			for(size_t i = 0; i < plot_res_e; i++)
-        			{
-        				double x = i * dx;
-        				double E_exact = 0;
-        				E_str >> x >> E_exact;
-        				double E = poisson.E(x);
-
-        				double dist = std::abs(E - E_exact);
-        				E_max_error = std::max(E_max_error, dist);
-        				E_l2_error += (dist*dist);
-        				E_max_exact = std::max(E_max_exact, E_exact);
-        			}
-        			E_l2_error *= dx;
-        			str_E_max_err << t << " " << E_max_error << std::endl;
-        			str_E_l2_err << t << " " << E_l2_error << std::endl;
-        			str_E_max_rel_err << t << " " << E_max_error/E_max_exact << std::endl;
-        			str_E_l2_rel_err << t << " " << E_l2_error/E_max_exact << std::endl;
-        		}
+                std::ofstream rho_str( "rho_" + std::to_string(t) + ".txt" );
+                for(size_t i = 0; i < quad_nodes.size(); i++)
+                {
+                	rho_str << quad_nodes(i) << " " << quad_vals(i) << std::endl;
+                }
             }
         }
 

@@ -1,7 +1,8 @@
 noinst_PROGRAMS = test_wendland test_direct_interpolator test_pou_interpolator test_kd_tree \
                   direct_vlasov_1d_periodic test_gauss_konrod piecewise_vlasov_1d_periodic \
 		  piecewise_vlasov_1d_ion_turbulence vortex_direct_interpolation \
-                  pic_solver
+                  pic_solver pic_solver_colella_without_remesh \
+		  piecewise_vlasov_2d_periodic
 
 test_wendland_SOURCES = test_wendland.cpp
 test_wendland_LDADD = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp
@@ -27,6 +28,9 @@ direct_vlasov_1d_periodic_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(
 piecewise_vlasov_1d_periodic_SOURCES = piecewise_vlasov_1d_periodic.cpp
 piecewise_vlasov_1d_periodic_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp
 
+piecewise_vlasov_2d_periodic_SOURCES = piecewise_vlasov_2d_periodic.cpp
+piecewise_vlasov_2d_periodic_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp -lfftw3 -lfftw3f
+
 piecewise_vlasov_1d_ion_turbulence_SOURCES = piecewise_vlasov_1d_ion_turbulence.cpp
 piecewise_vlasov_1d_ion_turbulence_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp
 
@@ -36,4 +40,6 @@ vortex_direct_interpolation_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la 
 pic_solver_SOURCES = pic_solver.cpp
 pic_solver_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS)
 
+pic_solver_colella_without_remesh_SOURCES = pic_solver_colella_without_remesh.cpp
+pic_solver_colella_without_remesh_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS)
 
