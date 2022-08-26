@@ -44,7 +44,7 @@ int main()
 	size_t Nt = T / dt + 1;
 
 	constexpr double tikhonov_mu { 1e-12 };
-	constexpr size_t min_per_box = 2000;
+	constexpr size_t min_per_box = 1000;
 
 	double Lx = 4 * M_PI;
 	double Ly = 4 * M_PI;
@@ -158,46 +158,47 @@ int main()
 
 		// Compute new rho-values:
 		arma::vec rho_tmp(n_poiss, arma::fill::ones);
-		#pragma omp parallel
+		size_t m = sfx.cover.n_rows;
+		arma::mat tmp1(1,1);
+		arma::mat tmp2(1,1);
+		arma::mat tmp3(1,1);
+		arma::mat tmp4(1,1);
+		#pragma omp parallel for
+		for(size_t x_ind = 0; x_ind < nx_poiss; x_ind++)
 		{
-			arma::vec my_rho(rho_tmp.size(),arma::fill::zeros);
-			arma::vec coeff( 2*min_per_box );
-
-			#pragma omp for schedule(dynamic)
-			for ( size_t i = 0; i < sfx.cover.n_rows; ++i )
+			for(size_t y_ind = 0; y_ind < ny_poiss; y_ind++)
 			{
-				const auto &local = sfx.local_interpolants[i];
-				double x_min = sfx.cover(i,0), y_min = sfx.cover(i,1),
-					   v_min = sfx.cover(i,2), w_min = sfx.cover(i,3),
-					   x_max = sfx.cover(i,4), y_max = sfx.cover(i,5),
-					   v_max = sfx.cover(i,6), w_max = sfx.cover(i,7);
-
-
-				size_t n = local.points().n_rows;
-				const arma::mat &X = local.points();
-
-				if ( n > coeff.size() ) coeff.resize(n);
-
-				for ( size_t j = 0; j < n; ++j )
+				double x = x_ind * dx_poiss;
+				double y = y_ind * dy_poiss;
+				for(size_t l = 0; l < m; l++)
 				{
-					double v = X(j,2);
-					double w = X(j,3);
-					coeff(j) = local.coeffs()(j) * sigma(2) * sigma(3)
-							 * ( W.integral((v-v_min)/sigma(2)) +
-								 W.integral((v_max-v)/sigma(2)) )
-						     * ( W.integral((w-w_min)/sigma(3)) +
-							     W.integral((w_max-w)/sigma(3)) );
+					double x_min = sfx.cover(l,0), y_min = sfx.cover(l,1),
+						   v_min = sfx.cover(l,2), w_min = sfx.cover(l,3),
+						   x_max = sfx.cover(l,4), y_max = sfx.cover(l,5),
+						   v_max = sfx.cover(l,6), w_max = sfx.cover(l,7);
+
+					if( x >= x_min && x < x_max && y >= y_min && y < y_max)
+					{
+						arma::vec coeffs = sfx.local_interpolants[l].coeffs();
+						for(size_t i = 0; i < coeffs.n_rows; i++)
+						{
+							double xi = sfx.local_interpolants[l].points()(i, 0);
+							double yi = sfx.local_interpolants[l].points()(i, 1);
+							double vi = sfx.local_interpolants[l].points()(i, 2);
+							double wi = sfx.local_interpolants[l].points()(i, 3);
+							tmp1(0,0) = x;
+							tmp2(0,0) = xi;
+							tmp3(0,0) = y;
+							tmp4(0,0) = yi;
+
+							double curr = coeffs(i) * arma::dot( Kx(tmp1, tmp2) , Ky(tmp3, tmp4)) * sigma(2) * sigma(3)
+										* ( W.integral((vi-v_min)/sigma(2)) + W.integral((v_max-vi)/sigma(2)) )
+										* ( W.integral((wi-w_min)/sigma(3)) + W.integral((w_max-wi)/sigma(3)) );
+							rho_tmp(y_ind + x_ind * ny_poiss) = rho_tmp(y_ind + x_ind * ny_poiss) - curr;
+						}
+					}
 				}
-
-				arma::rowvec box { x_min, y_min, x_max, y_max };
-				arma::uvec idx = rho_tree.index_query(box);
-				arma::vec tmpx = rho_points.col(0);
-				arma::vec tmpy = rho_points.col(1);
-				my_rho(idx) += Kx(tmpx(idx),X.col(0))%Ky(tmpy(idx),X.col(1))*coeff( arma::span(0,n-1) );
 			}
-
-			#pragma omp critical
-			rho_tmp -= my_rho;
 		}
 
         std::stringstream filename; filename << 'p' << t << ".txt";
