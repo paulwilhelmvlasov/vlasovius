@@ -16,8 +16,8 @@
  * You should have received a copy of the GNU General Public License along with
  * Der Gerät; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
-#ifndef VLASOVIUS_MISC_GMRES_HPP
-#define VLASOVIUS_MISC_GMRES_HPP
+#ifndef VLASOVIUS_POISSON_GMRES_HPP
+#define VLASOVIUS_POISSON_GMRES_HPP
 
 #include <cmath>
 #include <memory>
@@ -26,9 +26,9 @@
 #include <iomanip>
 #include <iostream>
 
-#include <vlasovius/misc/blas.hpp>
-#include <vlasovius/misc/gmres.hpp>
-#include <vlasovius/misc/lapack.hpp>
+#include <vlasovius/poisson/blas.hpp>
+#include <vlasovius/poisson/gmres.hpp>
+#include <vlasovius/poisson/lapack.hpp>
 
 namespace vlasovius
 {
@@ -52,6 +52,6 @@ void gmres( size_t n,       real *x, size_t stride_x,
 
 }
 
-#include <vlasovius/misc/gmres.tpp>
+#include <vlasovius/poisson/gmres.tpp>
 #endif
 

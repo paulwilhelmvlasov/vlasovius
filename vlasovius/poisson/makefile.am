@@ -1,0 +1,3 @@
+noinst_LTLIBRARIES = libpoisson.la
+
+libpoisson_la_SOURCES = poissonfft.cpp lapack.cpp blas.cpp

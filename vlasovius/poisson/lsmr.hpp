@@ -16,14 +16,14 @@
  * You should have received a copy of the GNU General Public License along with
  * Der Gerät; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
-#ifndef VLASOVIUS_MISC_LSMR_H
-#define VLASOVIUS_MISC_LSMR_H
+#ifndef VLASOVIUS_POISSON_LSMR_H
+#define VLASOVIUS_POISSON_LSMR_H
 
 #include <cmath>
 #include <limits>
 #include <iomanip>
 #include <iostream>
-#include <vlasovius/misc/blas.hpp>
+#include <vlasovius/poisson/blas.hpp>
 
 namespace vlasovius
 {
@@ -71,6 +71,6 @@ void lsmr( size_t m, size_t n, const mat& A, const transposed_mat& At,
 
 }
 
-#include <vlasovius/misc/lsmr.tpp>
+#include <vlasovius/poisson/lsmr.tpp>
 #endif
 

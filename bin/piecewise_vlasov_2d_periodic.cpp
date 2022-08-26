@@ -25,8 +25,8 @@
 #include <vlasovius/kernels/wendland.h>
 #include <vlasovius/kernels/tensorised_kernel.h>
 #include <vlasovius/interpolators/piecewise_interpolator.h>
-#include <vlasovius/misc/poisson_fft.h>
-#include <vlasovius/misc/fields.hpp>
+#include <vlasovius/poisson/poissonfft.hpp>
+#include <vlasovius/poisson/fields.hpp>
 
 constexpr size_t order = 2;
 using wendland_t       = vlasovius::kernels::wendland<1,order>;
@@ -44,7 +44,7 @@ int main()
 	size_t Nt = T / dt + 1;
 
 	constexpr double tikhonov_mu { 1e-12 };
-	constexpr size_t min_per_box = 1000;
+	constexpr size_t min_per_box = 2000;
 
 	double Lx = 4 * M_PI;
 	double Ly = 4 * M_PI;
@@ -78,12 +78,12 @@ int main()
 	vlasovius::geometry::kd_tree rho_tree(rho_points);
 
 	wendland_t W;
-	arma::rowvec sigma { 1, 1, 1, 1 };
+	arma::rowvec sigma { 3, 3, 3, 3 };
 	kernel_t   K ( W, sigma );
 	kernel_t   Kx( W, arma::rowvec { sigma(0) } );
 	kernel_t   Ky( W, arma::rowvec { sigma(1) } );
 
-	size_t Nx = 64, Ny = 64, Nv = 128, Nw = 128;
+	size_t Nx = 32, Ny = 32, Nv = 64, Nw = 64;
 	size_t N_total = Nx * Ny * Nv * Nw;
 	std::cout << "Number of particles: " << N_total << ".\n";
 
@@ -144,11 +144,10 @@ int main()
 	std::ofstream Emax_file( "Emax2d.txt" );
 	while ( t < T )
 	{
-		std::cout << "t = " << t << ". " << std::endl;
+		//std::cout << "t = " << t << ". " << std::endl;
 		vlasovius::misc::stopwatch clock;
 
 		if ( t + dt > T ) dt = T - t;
-
 
 		xv.col(0) += dt*xv.col(2);             // Move x particles
 		xv.col(0) -= Lx * floor(xv.col(0) / Lx); // Set to periodic positions.
@@ -173,6 +172,7 @@ int main()
 					   x_max = sfx.cover(i,4), y_max = sfx.cover(i,5),
 					   v_max = sfx.cover(i,6), w_max = sfx.cover(i,7);
 
+
 				size_t n = local.points().n_rows;
 				const arma::mat &X = local.points();
 
@@ -193,12 +193,28 @@ int main()
 				arma::uvec idx = rho_tree.index_query(box);
 				arma::vec tmpx = rho_points.col(0);
 				arma::vec tmpy = rho_points.col(1);
-				my_rho(idx) += Kx(tmpx(idx),X)*Ky(tmpy(idx),X)*coeff( arma::span(0,n-1) );
+				my_rho(idx) += Kx(tmpx(idx),X.col(0))%Ky(tmpy(idx),X.col(1))*coeff( arma::span(0,n-1) );
 			}
 
 			#pragma omp critical
 			rho_tmp -= my_rho;
 		}
+
+        std::stringstream filename; filename << 'p' << t << ".txt";
+        std::ofstream file( filename.str() );
+        const size_t plotNx = conf.Nx, plotNy = conf.Ny;
+        for ( size_t i = 0; i < plotNx; ++i )
+        {
+            double x = conf.x_min + i*(conf.x_max-conf.x_min)/plotNx;
+            for ( size_t j = 0; j < plotNy; ++j )
+            {
+                double y = conf.y_min + j*(conf.y_max-conf.y_min)/plotNy;
+                size_t l = i + j * plotNx;
+                file << x << " " << y << " " << rho_tmp(l) << std::endl;
+
+            }
+            file << std::endl;
+        }
 
 		#pragma omp parallel for
 		for(size_t i = 0; i < n_poiss; i++)
@@ -232,7 +248,7 @@ int main()
         Emax_file << std::setw(15) << n_step*conf.dt << std::setw(15) << std::setprecision(5) << std::scientific << Emax << std::endl;
         std::cout << std::setw(15) << n_step*conf.dt << std::setw(15) << std::setprecision(5) << std::scientific << Emax << std::endl;
 
-        std::cout << "This time step took: " << elapsed << "s." <<std::endl;
+        //std::cout << "This time step took: " << elapsed << "s." <<std::endl;
 
 
 		t += dt;

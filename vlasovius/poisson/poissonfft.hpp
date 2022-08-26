@@ -17,8 +17,8 @@
  * Der Gerät; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
 
-#ifndef DERGERAET_POISSON_H
-#define DERGERAET_POISSON_H
+#ifndef VLASOVIUS_POISSON_POISSONFFT_HPP
+#define VLASOVIUS_POISSON_POISSONFFT_HPP
 
 #include <fftw3.h>
 
@@ -219,6 +219,5 @@ namespace dim3
 
 }
 
-#include <vlasovius/misc/poisson_fft.tpp>
 #endif
 

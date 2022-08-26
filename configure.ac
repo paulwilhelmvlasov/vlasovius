@@ -27,6 +27,7 @@ AC_CONFIG_FILES([Makefile
                  vlasovius/makefile
                  vlasovius/kernels/makefile
                  vlasovius/geometry/makefile
+                 vlasovius/poisson/makefile
                  bin/makefile])
 
 LT_INIT

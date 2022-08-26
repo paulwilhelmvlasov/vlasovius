@@ -1,6 +1,6 @@
-SUBDIRS = kernels geometry
+SUBDIRS = kernels geometry poisson
 
 noinst_LTLIBRARIES = libvlasovius.la
 
 libvlasovius_la_SOURCES = 
-libvlasovius_la_LIBADD  = kernels/libkernels.la geometry/libgeometry.la
+libvlasovius_la_LIBADD  = kernels/libkernels.la geometry/libgeometry.la poisson/libpoisson.la

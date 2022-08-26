@@ -16,8 +16,8 @@
  * You should have received a copy of the GNU General Public License along with
  * Der Gerät; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
-#ifndef VLASOVIUS_MISC_SPLINES_HPP
-#define VLASOVIUS_MISC_SPLINES_HPP
+#ifndef VLASOVIUS_POISSON_SPLINES_HPP
+#define VLASOVIUS_POISSON_SPLINES_HPP
 
 #include <cstddef>
 

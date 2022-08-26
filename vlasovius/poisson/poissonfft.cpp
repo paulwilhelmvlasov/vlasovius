@@ -1,9 +1,9 @@
 /*
  * Copyright (C) 2022 Matthias Kirchhart and Paul Wilhelm
  *
- * This file is part of Der Gerät, a solver for the Vlasov–Poisson equation.
+ * This file is part of vlasovius, a solver for the Vlasov–Poisson equation.
  *
- * Der Gerät is free software; you can redistribute it and/or modify it under
+ * Vlasovius is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free
  * Software Foundation; either version 3, or (at your option) any later
  * version.
@@ -16,7 +16,9 @@
  * You should have received a copy of the GNU General Public License along with
  * Der Gerät; see the file COPYING.  If not see http://www.gnu.org/licenses.
  */
-#include <vlasovius/misc/poisson_fft.h>
+
+
+#include <vlasovius/poisson/poissonfft.hpp>
 
 #include <cmath>
 #include <memory>
@@ -29,7 +31,7 @@ namespace vlasovius
 namespace dim1
 {
 
-    poisson<double>::poisson(double Lx, size_t Nx):
+    poisson<double>::poisson(double Lx, size_t Nx) :
         Lx { Lx }, Lx_inv{1.0 / Lx}, Nx{Nx}
     {
         using memptr = std::unique_ptr<double,decltype(std::free)*>;

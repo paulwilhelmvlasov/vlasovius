@@ -16,15 +16,15 @@
  * You should have received a copy of the GNU General Public License along with
  * Der Gerät; see the file COPYING. If not see http://www.gnu.org/licenses.
  */
-#ifndef VLASOVIUS_MISC_FIELDS_HPP
-#define VLASOVIUS_MISC_FIELDS_HPP
+#ifndef VLASOVIUS_POISSON_FIELDS_HPP
+#define VLASOVIUS_POISSON_FIELDS_HPP
 
 #include <limits>
 
-#include <vlasovius/misc/lsmr.hpp>
-#include <vlasovius/misc/gmres.hpp>
-#include <vlasovius/misc/config.hpp>
-#include <vlasovius/misc/splines.hpp>
+#include <vlasovius/poisson/lsmr.hpp>
+#include <vlasovius/poisson/gmres.hpp>
+#include <vlasovius/poisson/config.hpp>
+#include <vlasovius/poisson/splines.hpp>
 
 namespace vlasovius
 {
