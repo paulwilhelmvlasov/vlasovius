@@ -63,7 +63,7 @@ int main()
 	arma::vec rho( rho_points.size() );
 	vlasovius::geometry::kd_tree rho_tree(rho_points);
 
-	double vmax = 6;
+	double vmax = 10;
 
 	// Initialise xv.
 	xv.set_size( Nx*Nv,2 );
@@ -80,8 +80,8 @@ int main()
 		constexpr double k     = 0.5;
 		// Linear Landau damping:
 
-		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
-					* std::exp(-0.5 * v * v);
+		//f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
+		//			* std::exp(-0.5 * v * v);
 
 
 		// Two Stream Instability:
@@ -103,6 +103,9 @@ int main()
 				* (np * std::exp( -0.5 * v*v )
 				+  nb * std::exp( -0.5 * (v-vb)*(v-vb) / (vt * vt)) );
 		*/
+
+		// Expansion into a uniform ion background:
+		f( j + Nv*i ) = 0.39894228040143267793994 * std::exp(-0.5 * v*v) * std::exp(-0.5 * (x-2*M_PI)*(x-2*M_PI));
 	}
 
 	size_t res = 300;
@@ -124,8 +127,8 @@ int main()
 	double t = 0, T = 30.25, dt = 1./16.;
 	std::ofstream e_amp_str("E.txt");
 	std::ofstream e_l2_str("E_l2.txt");
-	//std::ofstream str_f_max_err("f_max_error.txt");
-	//std::ofstream str_f_l2_err("f_l2_error.txt");
+	std::ofstream str_f_max_err("f_max_error.txt");
+	std::ofstream str_f_l2_err("f_l2_error.txt");
 	std::ofstream str_E_max_err("E_max_error.txt");
 	std::ofstream str_E_l2_err("E_l2_error.txt");
 	std::ofstream str_E_max_rel_err("E_max_rel_error.txt");
@@ -138,11 +141,11 @@ int main()
 		if ( t + dt > T ) dt = T - t;
 
 
-//		if ( count % (10*16) == 0 )
-//		{
-//			interpolator_t sfx { K, xv, f, min_per_box, tikhonov_mu, num_threads };
-//			plotf = sfx(plotX);
-//			std::ofstream fstr( "f_" + std::to_string(t) + ".txt" );
+		if ( count % (10*16) == 0 )
+		{
+			interpolator_t sfx { K, xv, f, min_per_box, tikhonov_mu, num_threads };
+			plotf = sfx(plotX);
+			std::ofstream fstr( "f_" + std::to_string(t) + ".txt" );
 			/*
 			std::ofstream coverBoxes_str("coverBoxes_" + std::to_string(t) + ".txt" );
 			arma::mat coverBoxes = sfx.cover;
@@ -187,31 +190,30 @@ int main()
 			//double f_max_error = 0;
 			//double f_l2_error = 0;
 
-//			for ( size_t i = 0; i <= res; ++i )
-//			{
-//				for ( size_t j = 0; j <= res; ++j )
-//				{
-//					double x = plotX(j + (res + 1)*i,0);
-//					double v = plotX(j + (res + 1)*i,1);
-					//double f = plotf(j + (res+1)*i);
+			for ( size_t i = 0; i <= res; ++i )
+			{
+				for ( size_t j = 0; j <= res; ++j )
+				{
+					double x = plotX(j + (res + 1)*i,0);
+					double v = plotX(j + (res + 1)*i,1);
+					double f = plotf(j + (res+1)*i);
 
 //					double f = plotf(j+(res+1)*i) - 0.39894228040143267793994 * std::exp(-0.5 * v * v);
-//					fstr << x << " " << v << " " << f << std::endl;
+					fstr << x << " " << v << " " << f << std::endl;
 
-				//	double f_exact = 0;
-				//	f_exact_str >> x >> v >> f_exact;
-				//	f_max_error = std::max(std::abs(f - f_exact), f_max_error);
-				//	f_l2_error += (f - f_exact)*(f - f_exact);
+					//double f_exact = 0;
+					//f_exact_str >> x >> v >> f_exact;
+					//f_max_error = std::max(std::abs(f - f_exact), f_max_error);
+					//f_l2_error += (f - f_exact)*(f - f_exact);
 
-//				}
-//				fstr << "\n";
+				}
+				fstr << "\n";
 				//f_exact_str.ignore();
-//			}
+			}
 
 			//str_f_max_err << t << " " << f_max_error << std::endl;
 			//str_f_l2_err << t << " " << std::sqrt(hx_plot * hv_plot * f_l2_error) << std::endl;
-
-//		}
+		}
 
 
 

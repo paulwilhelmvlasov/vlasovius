@@ -83,7 +83,7 @@ int main()
 	kernel_t   Kx( W, arma::rowvec { sigma(0) } );
 	kernel_t   Ky( W, arma::rowvec { sigma(1) } );
 
-	size_t Nx = 32, Ny = 32, Nv = 64, Nw = 64;
+	size_t Nx = 16, Ny = 16, Nv = 32, Nw = 32;
 	size_t N_total = Nx * Ny * Nv * Nw;
 	std::cout << "Number of particles: " << N_total << ".\n";
 
@@ -116,7 +116,7 @@ int main()
 
 					// Linear Landau damping:
 					f(curr) = c * std::exp(-0.5*(v*v+w*w))
-							* (1 + 0.05*std::cos(0.5*x)*std::cos(0.5*y));
+							* (1 + 0.00*std::cos(0.5*x)*std::cos(0.5*y));
 				}
 
 	vlasovius::dim2::config_t<double> conf;
