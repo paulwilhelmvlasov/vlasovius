@@ -80,8 +80,8 @@ int main()
 		constexpr double k     = 0.5;
 		// Linear Landau damping:
 
-		//f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
-		//			* std::exp(-0.5 * v * v);
+//		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
+//					* std::exp(-0.5 * v * v);
 
 
 		// Two Stream Instability:
@@ -124,15 +124,9 @@ int main()
 	size_t count = 0;
 	size_t timeStepCounter = 0;
 	double totalTime = 0;
-	double t = 0, T = 30.25, dt = 1./16.;
+	double t = 0, T = 400.25, dt = 1./16.;
 	std::ofstream e_amp_str("E.txt");
 	std::ofstream e_l2_str("E_l2.txt");
-	std::ofstream str_f_max_err("f_max_error.txt");
-	std::ofstream str_f_l2_err("f_l2_error.txt");
-	std::ofstream str_E_max_err("E_max_error.txt");
-	std::ofstream str_E_l2_err("E_l2_error.txt");
-	std::ofstream str_E_max_rel_err("E_max_rel_error.txt");
-	std::ofstream str_E_l2_rel_err("E_l2_rel_error.txt");
 	while ( t < T )
 	{
 		std::cout << "t = " << t << ". " << std::endl;
@@ -146,50 +140,6 @@ int main()
 			interpolator_t sfx { K, xv, f, min_per_box, tikhonov_mu, num_threads };
 			plotf = sfx(plotX);
 			std::ofstream fstr( "f_" + std::to_string(t) + ".txt" );
-			/*
-			std::ofstream coverBoxes_str("coverBoxes_" + std::to_string(t) + ".txt" );
-			arma::mat coverBoxes = sfx.cover;
-			for(size_t i = 0; i < coverBoxes.n_rows; i++)
-			{
-				coverBoxes_str << "\\draw (";
-				if(coverBoxes(i,0) < -100){
-					coverBoxes_str << -100;
-				}else if(coverBoxes(i,0) > 100){
-					coverBoxes_str << 100;
-				}else{
-					coverBoxes_str << coverBoxes(i,0);
-				}
-				coverBoxes_str << ", ";
-				if(coverBoxes(i,1) < -100){
-					coverBoxes_str << -100;
-				}else if(coverBoxes(i,1) > 100){
-					coverBoxes_str << 100;
-				}else{
-					coverBoxes_str << coverBoxes(i,1);
-				}
-				coverBoxes_str << ") rectangle (";
-				if(coverBoxes(i,2) < -100){
-					coverBoxes_str << -100;
-				}else if(coverBoxes(i,2) > 100){
-					coverBoxes_str << 100;
-				}else{
-					coverBoxes_str << coverBoxes(i,2);
-				}
-				coverBoxes_str << ", ";
-				if(coverBoxes(i,3) < -100){
-					coverBoxes_str << -100;
-				}else if(coverBoxes(i,3) > 100){
-					coverBoxes_str << 100;
-				}else{
-					coverBoxes_str << coverBoxes(i,3);
-				}
-				coverBoxes_str << ");" << std::endl;
-			}
-			*/
-			//std::ifstream f_exact_str("../../res=4096x8192_plotres=400/f_"+ std::to_string(t) + ".txt" );
-			//double f_max_error = 0;
-			//double f_l2_error = 0;
-
 			for ( size_t i = 0; i <= res; ++i )
 			{
 				for ( size_t j = 0; j <= res; ++j )
@@ -198,21 +148,10 @@ int main()
 					double v = plotX(j + (res + 1)*i,1);
 					double f = plotf(j + (res+1)*i);
 
-//					double f = plotf(j+(res+1)*i) - 0.39894228040143267793994 * std::exp(-0.5 * v * v);
 					fstr << x << " " << v << " " << f << std::endl;
-
-					//double f_exact = 0;
-					//f_exact_str >> x >> v >> f_exact;
-					//f_max_error = std::max(std::abs(f - f_exact), f_max_error);
-					//f_l2_error += (f - f_exact)*(f - f_exact);
-
 				}
 				fstr << "\n";
-				//f_exact_str.ignore();
 			}
-
-			//str_f_max_err << t << " " << f_max_error << std::endl;
-			//str_f_l2_err << t << " " << std::sqrt(hx_plot * hv_plot * f_l2_error) << std::endl;
 		}
 
 
@@ -272,34 +211,6 @@ int main()
 		e_amp_str << t << " " << max_e  << std::endl;
 		e_l2_str << t << " " << l2_e  << std::endl;
 		std::cout << "Max-norm of E: " << max_e << "." << std::endl;
-
-		if(count % (1*16) == 0)
-		{
-			std::ifstream E_str( "../TestRes/E_" + std::to_string(t) + ".txt" );
-			size_t plot_res_e = 400;
-			double dx = L / plot_res_e;
-			double E_max_error = 0;
-			double E_l2_error = 0;
-			double E_max_exact = 0;
-			for(size_t i = 0; i < plot_res_e; i++)
-			{
-				double x = i * dx;
-				double E_exact = 0;
-				E_str >> x >> E_exact;
-				double E = poisson.E(x);
-
-				double dist = std::abs(E - E_exact);
-				E_max_error = std::max(E_max_error, dist);
-				E_l2_error += (dist*dist);
-				E_max_exact = std::max(E_max_exact, E_exact);
-			}
-			E_l2_error *= dx;
-			str_E_max_err << t << " " << E_max_error << std::endl;
-			str_E_l2_err << t << " " << E_l2_error << std::endl;
-			str_E_max_rel_err << t << " " << E_max_error/E_max_exact << std::endl;
-			str_E_l2_rel_err << t << " " << E_l2_error/E_max_exact << std::endl;
-		}
-
 
 		double elapsed = clock.elapsed();
 		timeStepCounter++;
