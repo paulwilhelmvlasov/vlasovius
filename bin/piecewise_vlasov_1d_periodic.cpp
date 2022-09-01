@@ -63,7 +63,7 @@ int main()
 	arma::vec rho( rho_points.size() );
 	vlasovius::geometry::kd_tree rho_tree(rho_points);
 
-	double vmax = 10;
+	double vmax = 6;
 
 	// Initialise xv.
 	xv.set_size( Nx*Nv,2 );
@@ -80,8 +80,8 @@ int main()
 		constexpr double k     = 0.5;
 		// Linear Landau damping:
 
-//		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
-//					* std::exp(-0.5 * v * v);
+		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
+					* std::exp(-0.5 * v * v);
 
 
 		// Two Stream Instability:
@@ -103,9 +103,6 @@ int main()
 				* (np * std::exp( -0.5 * v*v )
 				+  nb * std::exp( -0.5 * (v-vb)*(v-vb) / (vt * vt)) );
 		*/
-
-		// Expansion into a uniform ion background:
-		f( j + Nv*i ) = 0.39894228040143267793994 * std::exp(-0.5 * v*v) * std::exp(-0.5 * (x-2*M_PI)*(x-2*M_PI));
 	}
 
 	size_t res = 300;
@@ -124,7 +121,7 @@ int main()
 	size_t count = 0;
 	size_t timeStepCounter = 0;
 	double totalTime = 0;
-	double t = 0, T = 400.25, dt = 1./16.;
+	double t = 0, T = 30.25, dt = 1./16.;
 	std::ofstream e_amp_str("E.txt");
 	std::ofstream e_l2_str("E_l2.txt");
 	while ( t < T )
@@ -140,6 +137,7 @@ int main()
 			interpolator_t sfx { K, xv, f, min_per_box, tikhonov_mu, num_threads };
 			plotf = sfx(plotX);
 			std::ofstream fstr( "f_" + std::to_string(t) + ".txt" );
+
 			for ( size_t i = 0; i <= res; ++i )
 			{
 				for ( size_t j = 0; j <= res; ++j )
@@ -159,25 +157,34 @@ int main()
 		xv.col(0) += dt*xv.col(1);             // Move particles
 		xv.col(0) -= L * floor(xv.col(0) / L); // Set to periodic positions.
 
+		std::cout << "a" << std::endl;
 
 		interpolator_t sfx { K, xv, f, min_per_box, tikhonov_mu, num_threads };
 		rho.fill(1);
-		#pragma omp parallel
+		//#pragma omp parallel
 		{
+			std::cout << "b" << std::endl;
 			arma::vec my_rho(rho.size(),arma::fill::zeros);
 			arma::vec coeff( 2*min_per_box );
 
-			#pragma omp for schedule(dynamic)
+			std::cout << sfx.cover.n_rows << std::endl;
+			//#pragma omp for schedule(dynamic)
 			for ( size_t i = 0; i < sfx.cover.n_rows; ++i )
 			{
+				std::cout << i << std::endl;
 				const auto &local = sfx.local_interpolants[i];
 				double x_min = sfx.cover(i,0), v_min = sfx.cover(i,1),
 				       x_max = sfx.cover(i,2), v_max = sfx.cover(i,3);
 
+				std::cout << "Here1" << std::endl;
 				size_t n = local.points().n_rows;
 				const arma::mat &X = local.points();
 
+				std::cout << "Here2" << std::endl;
+
 				if ( n > coeff.size() ) coeff.resize(n);
+
+				std::cout << "Here3" << std::endl;
 
 				for ( size_t j = 0; j < n; ++j )
 				{
@@ -187,14 +194,25 @@ int main()
 					             W.integral((v_max-v)/sigma(1)) );
 				}
 
+				std::cout << "Here4" << std::endl;
 				arma::rowvec box { x_min, x_max };
+				std::cout << "Here41" << std::endl;
 				arma::uvec idx = rho_tree.index_query(box);
+				std::cout << "Here42" << std::endl;
+				std::cout << idx.n_rows << std::endl;
+				std::cout << "Here43" << std::endl;
+				std::cout << X.n_rows << " " << X.n_cols << std::endl;
+				std::cout << "Here44" << std::endl;
 				my_rho(idx) += Kx(rho_points(idx),X)*coeff( arma::span(0,n-1) );
+				std::cout << "Here5" << std::endl;
 			}
 
-			#pragma omp critical
+			std::cout << "c" << std::endl;
+			//#pragma omp critical
 			rho -= my_rho;
 		}
+
+		std::cout << "a" << std::endl;
 
 		poisson.update_rho( rho );
 		double max_e = 0;
