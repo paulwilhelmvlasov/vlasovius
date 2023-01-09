@@ -36,10 +36,17 @@ template <typename rbf_function>
 arma::mat tensorised_kernel<rbf_function>::operator()( const arma::mat &X, const arma::mat &Y, size_t threads ) const
 {
 	#ifndef NDEBUG
-	if ( X.n_cols != inv_sigma.n_cols || Y.n_cols != inv_sigma.n_cols )
+	if ( X.n_cols != inv_sigma.n_cols )
 	{
 		throw std::logic_error { "vlasovius::kernels::tensorised_kernel::operator(): "
-								 "Dimension mismatch." };
+								 "Dimension mismatch. X.n_cols != inv_sigma.n_cols" };
+	}
+	if ( Y.n_cols != inv_sigma.n_cols )
+	{
+		std::cout << Y.n_cols << std::endl;
+		std::cout << inv_sigma.n_cols << std::endl;
+		throw std::logic_error { "vlasovius::kernels::tensorised_kernel::operator(): "
+									 "Dimension mismatch. Y.n_cols != inv_sigma.n_cols" };
 	}
 	#endif
 
