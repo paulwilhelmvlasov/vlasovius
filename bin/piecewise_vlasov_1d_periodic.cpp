@@ -29,7 +29,7 @@
 #include <vlasovius/misc/periodic_poisson_1d.h>
 
 
-constexpr size_t order = 4;
+constexpr size_t order = 2;
 using wendland_t       = vlasovius::kernels::wendland<1,order>;
 using kernel_t         = vlasovius::kernels::tensorised_kernel<wendland_t>;
 using interpolator_t   = vlasovius::interpolators::piecewise_interpolator<kernel_t>;
@@ -38,18 +38,18 @@ using poisson_t        = vlasovius::misc::poisson_gedoens::periodic_poisson_1d<8
 int main()
 {
 	constexpr double tikhonov_mu { 1e-12 };
-	constexpr size_t min_per_box = 100;
+	constexpr size_t min_per_box = 200;
 
 	double L = 4 * 3.14159265358979323846;
 	//double L = 2*3.14159265358979323846 / 0.3; // Bump on tail
 
 	wendland_t W;
-	arma::rowvec sigma { 1, 0.5 };
+	arma::rowvec sigma { 6, 3 };
 	kernel_t   K ( W, sigma );
 	kernel_t   Kx( W, arma::rowvec { sigma(0) } );
 
 
-	size_t Nx = 256, Nv = 512;
+	size_t Nx = 8, Nv = 32;
 	std::cout << "Number of particles: " << Nx*Nv << ".\n";
 
 	size_t num_threads = omp_get_max_threads();
@@ -104,10 +104,10 @@ int main()
 				+  nb * std::exp( -0.5 * (v-vb)*(v-vb) / (vt * vt)) );
 		*/
 		// Expansion into a uniform ion background:
-		f( j + Nv*i ) = 0.39894228040143267793994 * std::exp(-0.5 * v*v) * std::exp(-0.5 * (x-2*M_PI)*(x-2*M_PI));
+		//f( j + Nv*i ) = 0.39894228040143267793994 * std::exp(-0.5 * v*v) * std::exp(-0.5 * (x-2*M_PI)*(x-2*M_PI));
 	}
 
-	size_t res = 300;
+	size_t res = 400;
 	double hx_plot = L / res;
 	double hv_plot = 2.0 * vmax / res;
 	arma::mat plotX( (res + 1)*(res + 1), 2 );
@@ -123,18 +123,18 @@ int main()
 	size_t count = 0;
 	size_t timeStepCounter = 0;
 	double totalTime = 0;
-	double t = 0, T = 400.25, dt = 1./16.;
+	double t = 0, T = 100, dt = 1./16.;
 	std::ofstream e_amp_str("E.txt");
 	std::ofstream e_l2_str("E_l2.txt");
-	while ( t < T )
+	while ( t <= T )
 	{
 		std::cout << "t = " << t << ". " << std::endl;
 		vlasovius::misc::stopwatch clock;
 
-		if ( t + dt > T ) dt = T - t;
+		//if ( t + dt > T ) dt = T - t;
 
 
-		if ( count % (2*16) == 0 )
+		if ( count % (10*16) == 0 )
 		{
 			interpolator_t sfx { K, xv, f, min_per_box, tikhonov_mu, num_threads };
 			plotf = sfx(plotX);

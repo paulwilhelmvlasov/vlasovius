@@ -21,6 +21,7 @@ inline double f0_1d(double x, double v)
     constexpr double k     = 0.5;
     constexpr double fac   = 0.39894228040143267793994;
 
+    //return fac*(1+alpha*cos(k*x))*exp(-v*v/2) * v*v;
     return fac*(1+alpha*cos(k*x))*exp(-v*v/2);
 }
 
@@ -39,6 +40,27 @@ inline double shape_function_1d(double x, double eps = 1)
 	}
 
 	return (1 - x)/eps;
+}
+
+inline double w_3(double x, double eps = 1)
+{
+	x = x/eps;
+	// 2nd order standard univariate B-Spline:
+	if(x < 0)
+	{
+		x = -x;
+	}
+
+	if(x > 2)
+	{
+		return 0;
+	}
+	if(x < 1)
+	{
+		return (1 - 0.5*x - x*x + 0.5*x*x*x) / eps;
+	}
+
+	return (1 - 11.0/6.0*x + x*x - x*x*x/6.0) / eps;
 }
 
 void init_poiss_matrix(arma::mat &A, double delta_x)
@@ -78,12 +100,12 @@ int main() {
 	// This is an implementation of Wang et.al. 2nd-order PIC (see section 3.2).
 	// Set parameters.
     const double L  = 4*3.14159265358979323846;
-    const size_t Nx_f = 128;
+    const size_t Nx_f = 32;
     const size_t Nx_poisson = 16;
-    const size_t Nv_f = 512;
+    const size_t Nv_f = 128;
     const size_t N_f = Nx_f*Nv_f;
-    const double v_min = -10;
-    const double v_max =  10;
+    const double v_min = -6;
+    const double v_max =  6;
 
     // Compute derived quantities.
     const double eps_x = L/Nx_f;
@@ -92,9 +114,12 @@ int main() {
     const double delta_x_inv = 1/delta_x;
     const double L_inv  = 1/L;
 
-    const size_t Nt = 100 * 8;
+    const size_t Nt = 100 * 16;
     const double T = 100;
     const double dt = T / Nt;
+
+    const size_t n_remap = 5;
+    const bool remap = true;
 
     // Initiate particles.
     arma::mat xv;
@@ -123,7 +148,8 @@ int main() {
     //std::cout << poiss_solve_matrix << std::endl;
 
     // Time-loop using symplectic Euler.
-    std::ofstream str("E.txt");
+    std::ofstream E_max_str("E_max.txt");
+    std::ofstream E_l2_str("E_l2.txt");
     double t_total = 0;
     for(size_t nt = 0; nt <= Nt; nt++)
     {
@@ -164,6 +190,33 @@ int main() {
     		xv(k, 0) -= L*std::floor(xv(k, 0)*L_inv);
     	}
 
+    	// Remapping.
+    	/*
+    	if( remap && (nt % n_remap == 0) && (nt != 0) )
+    	{
+			arma::vec Q_remap = Q;
+			arma::mat xv_remap = xv;
+			#pragma omp parallel for
+			for ( size_t i = 0; i < Nx_f; ++i )
+			for ( size_t j = 0; j < Nv_f; ++j )
+			{
+				double x =         (i+0.5)*eps_x;
+				double v = v_min + (j+0.5)*eps_v;
+				size_t p = j+Nv_f*i;
+				Q_remap(p) = 0;
+				for(size_t k = 0; k < N_f; k++)
+				{
+					//Q_remap(p) += Q(k) * shape_function_1d(x - xv(k,0), eps_x) * shape_function_1d(v - xv(k,1), eps_v);
+					Q_remap(p) += Q(k) * w_3(x - xv(k,0), eps_x) * w_3(v - xv(k,1), eps_v);
+				}
+				xv_remap(p, 0) = x;
+				xv_remap(p, 1) = v;
+			}
+			Q = eps_x * eps_v * Q_remap;
+			xv = xv_remap;
+    	}
+    	*/
+
     	double t = nt * dt;
     	double elapsed = clock.elapsed();
     	t_total += elapsed;
@@ -171,7 +224,14 @@ int main() {
 
     	// Do analytics.
     	double E_max = E.max();
-    	str << t << " " << E_max << std::endl;
+    	double E_l2 = 0;
+    	for(size_t i = 0; i < Nx_poisson; i++)
+    	{
+    		E_l2 += E(i)*E(i);
+    	}
+    	E_l2 *= 0.5*L/Nx_poisson;
+    	E_max_str << t << " " << E_max << std::endl;
+    	E_l2_str << t << " " << E_l2 << std::endl;
     	std::cout << "E_max = " << E_max << std::endl;
 
     }

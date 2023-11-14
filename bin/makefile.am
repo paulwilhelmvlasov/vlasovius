@@ -1,7 +1,9 @@
 noinst_PROGRAMS = test_wendland test_direct_interpolator test_pou_interpolator test_kd_tree \
                   direct_vlasov_1d_periodic test_gauss_konrod piecewise_vlasov_1d_periodic \
-		  piecewise_vlasov_1d_ion_turbulence vortex_direct_interpolation \
-                  pic_solver piecewise_vlasov_2d_periodic particle_in_cell_collela
+		  piecewise_vlasov_1d_ion_turbulence pic_solver particle_in_cell_collela \
+		  # vortex_direct_interpolation \
+          # piecewise_vlasov_2d_periodic 
+          
 
 test_wendland_SOURCES = test_wendland.cpp
 test_wendland_LDADD = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp
@@ -27,19 +29,20 @@ direct_vlasov_1d_periodic_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(
 piecewise_vlasov_1d_periodic_SOURCES = piecewise_vlasov_1d_periodic.cpp
 piecewise_vlasov_1d_periodic_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp
 
-piecewise_vlasov_2d_periodic_SOURCES = piecewise_vlasov_2d_periodic.cpp
-piecewise_vlasov_2d_periodic_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp -lfftw3 -lfftw3f
+#piecewise_vlasov_2d_periodic_SOURCES = piecewise_vlasov_2d_periodic.cpp
+#piecewise_vlasov_2d_periodic_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp -lfftw3 -lfftw3f
 
 piecewise_vlasov_1d_ion_turbulence_SOURCES = piecewise_vlasov_1d_ion_turbulence.cpp
 piecewise_vlasov_1d_ion_turbulence_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp
 
-vortex_direct_interpolation_SOURCES = vortex_direct_interpolation.cpp
-vortex_direct_interpolation_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp
+#vortex_direct_interpolation_SOURCES = vortex_direct_interpolation.cpp
+#vortex_direct_interpolation_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp
 
 pic_solver_SOURCES = pic_solver.cpp
 pic_solver_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS)
 
 particle_in_cell_collela_SOURCES = particle_in_cell_collela.cpp
-particle_in_cell_collela_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lsuperlu
+particle_in_cell_collela_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) 
+# -lsuperlu
 
 

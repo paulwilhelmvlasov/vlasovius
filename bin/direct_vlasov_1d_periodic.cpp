@@ -265,7 +265,7 @@ int main()
 		}
 
 	// Initialise xv.
-	size_t Nx = 128, Nv = 256;
+	size_t Nx = 32, Nv = 128;
 	xv.set_size( Nx*Nv,2 );
 	f.resize( Nx*Nv );
 	for ( size_t i = 0; i < Nx; ++i )
@@ -307,11 +307,12 @@ int main()
 
 	size_t count = 0;
 	double totalTime = 0;
-	double t = 0, T = 30.25, dt = 1./8.;
-	//std::ofstream str("E.txt");
+	double t = 0, T = 100.25, dt = 1./16.;
+	std::ofstream E_linfty_str("E_linfty.txt");
+	std::ofstream E_l2_str("E_l2.txt");
 	//std::ofstream str_f_max_err("f_max_error.txt");
 	//std::ofstream str_f_l2_err("f_l2_error.txt");
-	while ( t < T )
+	while ( t <= T )
 	{
 		std::cout << "t = " << t << ". " << std::endl;
 
@@ -365,13 +366,24 @@ int main()
 
 			for ( size_t i = 0; i < xv_stage.n_rows; ++i )
 				k_xv[stage](i,1) = -poisson.E( xv_stage(i,0) );
-/*
+
 			if ( stage == 0 )
 			{
-				str << t << " " << norm(k_xv[stage].col(1),"inf")  << std::endl;
+				E_linfty_str << t << " " << norm(k_xv[stage].col(1),"inf")  << std::endl;
 				std::cout << "Max-norm of E: " << norm(k_xv[stage].col(1),"inf") << "." << std::endl;
+
+				size_t plot_x = 256;
+				double dx_plot = L/plot_x;
+				double E_l2_norm = 0;
+				for(size_t i = 0; i < plot_x; i++)
+				{
+					double x = (i+0.5)*dx_plot;
+					double E = poisson.E(x);
+					E_l2_norm += E*E;
+				}
+				E_l2_norm *= 0.5*dx_plot;
+				E_l2_str << t << " " << E_l2_norm << std::endl;
 			}
-*/
  		}
 
 		for ( size_t s = 0; s < 4; ++s )
@@ -385,7 +397,7 @@ int main()
 		std::cout << "Time for needed for time-step: " << elapsed << ".\n";
 		std::cout << "---------------------------------------" << elapsed << ".\n";
 
-		if ( t + dt > T ) dt = T - t;
+		//if ( t + dt > T ) dt = T - t;
 	}
 
 	std::cout << "Total simulation time: " << totalTime << std::endl;

@@ -34,6 +34,7 @@ double f0( double x, double v ) noexcept
     constexpr double fac   = 0.39894228040143267793994;
 
     return fac*(1+alpha*cos(k*x))*exp(-v*v/2);
+    //return fac*(1+alpha*cos(k*x))*exp(-v*v/2)*v*v;
 }
 
 int main()
@@ -44,8 +45,8 @@ int main()
     using poisson_t = vlasovius::misc::poisson_gedoens::periodic_poisson_1d<2>;
 
     const double L  = 4*3.14159265358979323846;
-    const size_t Nx = 32;
-    const size_t Nv = 64;
+    const size_t Nx = 128;
+    const size_t Nv = 512;
     const double v_min = -6;
     const double v_max =  6;
 
@@ -93,15 +94,17 @@ int main()
          W(j+Nv*i)     = dx*dv*f0(x,v);
     }
 
-    double t = 0, T = 30.25, dt = 1./8.;
+    double t = 0, T = 100, dt = 1./16.;
     double t_total = 0;
     size_t t_step_count = 0;
-    std::ofstream str("E.txt");
+    std::ofstream timings_file( "timings.txt" );
+    std::ofstream str_E_max("E_max.txt");
+    std::ofstream str_E_l2("E_l2.txt");
     std::ofstream str_E_max_err("E_max_error.txt");
     std::ofstream str_E_l2_err("E_l2_error.txt");
     std::ofstream str_E_max_rel_err("E_max_rel_error.txt");
     std::ofstream str_E_l2_rel_err("E_l2_rel_error.txt");
-    while ( t < T )
+    while ( t <= T )
     {
         std::cout << "t = " << t << ". " << std::endl;
         vlasovius::misc::stopwatch clock;
@@ -154,34 +157,40 @@ int main()
 
             if ( stage == 0 )
             {
-                str << t << " " << norm(k_xv[stage].col(1),"inf")  << std::endl;
+            	str_E_max << t << " " << norm(k_xv[stage].col(1),"inf")  << std::endl;
                 std::cout << "Max-norm of E: " << norm(k_xv[stage].col(1),"inf") << "." << std::endl;
 
-        		if(t_step_count % (1*16) == 0)
+        		if(t_step_count % (10*16) == 0 || true)
         		{
         			std::ifstream E_str( "../TestRes/E_" + std::to_string(t) + ".txt" );
-        			size_t plot_res_e = 400;
+        			size_t plot_res_e = 256;
         			double dx = L / plot_res_e;
+        			double E_l2 = 0;
         			double E_max_error = 0;
         			double E_l2_error = 0;
         			double E_max_exact = 0;
-        			for(size_t i = 0; i < plot_res_e; i++)
+        			for(size_t i = 0; i <= plot_res_e; i++)
         			{
         				double x = i * dx;
         				double E_exact = 0;
         				E_str >> x >> E_exact;
         				double E = poisson.E(x);
 
+        				E_l2 += E*E;
+
         				double dist = std::abs(E - E_exact);
         				E_max_error = std::max(E_max_error, dist);
         				E_l2_error += (dist*dist);
         				E_max_exact = std::max(E_max_exact, E_exact);
         			}
+        			E_l2 *= 0.5*dx;
         			E_l2_error *= dx;
         			str_E_max_err << t << " " << E_max_error << std::endl;
         			str_E_l2_err << t << " " << E_l2_error << std::endl;
         			str_E_max_rel_err << t << " " << E_max_error/E_max_exact << std::endl;
         			str_E_l2_rel_err << t << " " << E_l2_error/E_max_exact << std::endl;
+
+        			str_E_l2 << t << " " << E_l2  << std::endl;
         		}
             }
         }
@@ -192,11 +201,16 @@ int main()
 
         double elapsed = clock.elapsed();
         t_total += elapsed;
+        if(t_step_count % (10*16) == 0)
+        {
+        	timings_file << "Total time until t = " << t << " was "
+        			<< t_total << "s." << std::endl;
+        }
         t_step_count++;
         std::cout << "Time for needed for time-step: " << elapsed << ".\n";
         std::cout << "---------------------------------------" << elapsed << ".\n";
 
-        if ( t + dt > T ) dt = T - t;
+        //if ( t + dt > T ) dt = T - t;
     }
 
     std::cout << "Average time per time step: " << t_total/t_step_count << " s." << std::endl;
