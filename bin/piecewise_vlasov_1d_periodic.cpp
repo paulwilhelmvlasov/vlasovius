@@ -44,12 +44,12 @@ int main()
 	//double L = 2*3.14159265358979323846 / 0.3; // Bump on tail
 
 	wendland_t W;
-	arma::rowvec sigma { 6, 3 };
+	arma::rowvec sigma { 1, 0.5 };
 	kernel_t   K ( W, sigma );
 	kernel_t   Kx( W, arma::rowvec { sigma(0) } );
 
 
-	size_t Nx = 8, Nv = 32;
+	size_t Nx = 64, Nv = 256;
 	std::cout << "Number of particles: " << Nx*Nv << ".\n";
 
 	size_t num_threads = omp_get_max_threads();
@@ -79,16 +79,16 @@ int main()
 		constexpr double alpha = 0.01;
 		constexpr double k     = 0.5;
 		// Linear Landau damping:
-
+/*
 		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
 					* std::exp(-0.5 * v * v);
-
+*/
 
 		// Two Stream Instability:
-		/*
+
 		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
 						* v * v * std::exp(-0.5 * v * v);
-		*/
+
 
 
 		// Bump on tail benchmark:
@@ -107,7 +107,7 @@ int main()
 		//f( j + Nv*i ) = 0.39894228040143267793994 * std::exp(-0.5 * v*v) * std::exp(-0.5 * (x-2*M_PI)*(x-2*M_PI));
 	}
 
-	size_t res = 400;
+	size_t res = 256;
 	double hx_plot = L / res;
 	double hv_plot = 2.0 * vmax / res;
 	arma::mat plotX( (res + 1)*(res + 1), 2 );
@@ -126,6 +126,16 @@ int main()
 	double t = 0, T = 100, dt = 1./16.;
 	std::ofstream e_amp_str("E.txt");
 	std::ofstream e_l2_str("E_l2.txt");
+    std::ofstream statistics_file( "statistics.csv" );
+    statistics_file << R"("Time"; "L1-Norm"; "L2-Norm"; "Electric Energy"; "Kinetic Energy"; "Total Energy"; "Entropy")";
+    statistics_file << std::endl;
+
+    statistics_file << std::scientific;
+    std::cout << std::scientific;
+    double l1_norm = 0;
+    double l2_norm = 0;
+    double kinetic_energy = 0;
+    double entropy = 0;
 	while ( t <= T )
 	{
 		std::cout << "t = " << t << ". " << std::endl;
@@ -149,9 +159,23 @@ int main()
 					double f = plotf(j + (res+1)*i);
 
 					fstr << x << " " << v << " " << f << std::endl;
+
+					kinetic_energy += v*v*f;
+					if(f > 1e-10)
+					{
+						entropy += f*std::log(f);
+					}
+					l1_norm += std::abs(f);
+					l2_norm += f*f;
 				}
 				fstr << "\n";
 			}
+
+			kinetic_energy *= 0.5*hx_plot*hv_plot;
+			entropy *= hx_plot*hv_plot;
+			l1_norm *= hx_plot*hv_plot;
+			l2_norm = std::sqrt(l2_norm);
+			l2_norm *= hx_plot*hv_plot;
 		}
 
 
@@ -198,19 +222,41 @@ int main()
 
 		poisson.update_rho( rho );
 		double max_e = 0;
-		double l2_e = 0;
 		for ( size_t i = 0; i < xv.n_rows; ++i )
 		{
 			double E = poisson.E(xv(i,0));
 			xv(i,1) += -dt*E;
 			max_e = std::max(max_e,std::abs(E));
-			l2_e += (std::abs(E)*std::abs(E));
 		}
 
-		l2_e *= (L / N_poisson);
+		double l2_e = 0;
+		for(size_t i = 0; i < res; i++)
+		{
+			double x = i*hx_plot;
+			double E = poisson.E(x);
+			l2_e += E*E;
+		}
+
+		l2_e *= 0.5*hx_plot;
 		e_amp_str << t << " " << max_e  << std::endl;
 		e_l2_str << t << " " << l2_e  << std::endl;
 		std::cout << "Max-norm of E: " << max_e << "." << std::endl;
+
+		if ( count % (10*16) == 0 )
+		{
+            statistics_file << t       << "; "
+                            << l1_norm      << "; "
+                            << l2_norm      << "; "
+                            << l2_e << "; "
+                            << kinetic_energy << "; "
+                            << l2_e + kinetic_energy << "; "
+                            << entropy << std::endl;
+
+            l1_norm = 0;
+            l2_norm = 0;
+            kinetic_energy = 0;
+            entropy = 0;
+		}
 
 		double elapsed = clock.elapsed();
 		timeStepCounter++;

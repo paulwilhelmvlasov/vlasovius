@@ -220,7 +220,7 @@ int main()
 	using wendland_t = vlasovius::kernels::wendland<1,order>;
 	wendland_t W;
 
-	double L = 4*3.14159265358979323846, sigma_x  = 1, sigma_v = 0.5;
+	double L = 4*3.14159265358979323846, sigma_x  = 4, sigma_v = 2;
 	double mu = 1e-12;
 	double vmax = 6;
 	kernel_t K( sigma_x, sigma_v, L );
@@ -251,7 +251,7 @@ int main()
 		}
 	}
 
-	size_t res = 400;
+	size_t res = 256;
 	double hx_plot = L / res;
 	double hv_plot = 2.0 * vmax / res;
 	arma::mat plotX( (res + 1)*(res + 1), 2 );
@@ -265,7 +265,7 @@ int main()
 		}
 
 	// Initialise xv.
-	size_t Nx = 32, Nv = 128;
+	size_t Nx = 16, Nv = 64;
 	xv.set_size( Nx*Nv,2 );
 	f.resize( Nx*Nv );
 	for ( size_t i = 0; i < Nx; ++i )
@@ -279,16 +279,16 @@ int main()
 		constexpr double alpha = 0.01;
 		constexpr double k     = 0.5;
 		// Linear Landau damping:
-
-		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
-					* std::exp(-0.5 * v * v);
-
-
-		// Two Stream Instability:
 /*
 		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
-						* v * v * std::exp(-0.5 * v * v);
+					* std::exp(-0.5 * v * v);
 */
+
+		// Two Stream Instability:
+
+		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
+						* v * v * std::exp(-0.5 * v * v);
+
 
 		/*
 		// Bump on tail benchmark:
@@ -307,24 +307,35 @@ int main()
 
 	size_t count = 0;
 	double totalTime = 0;
-	double t = 0, T = 100.25, dt = 1./16.;
+	double t = 0, T = 100, dt = 1./16.;
 	std::ofstream E_linfty_str("E_linfty.txt");
 	std::ofstream E_l2_str("E_l2.txt");
 	//std::ofstream str_f_max_err("f_max_error.txt");
 	//std::ofstream str_f_l2_err("f_l2_error.txt");
+    std::ofstream statistics_file( "statistics.csv" );
+    statistics_file << R"("Time"; "L1-Norm"; "L2-Norm"; "Electric Energy"; "Kinetic Energy"; "Total Energy"; "Entropy")";
+    statistics_file << std::endl;
+
+    statistics_file << std::scientific;
+    std::cout << std::scientific;
+    double l1_norm = 0;
+    double l2_norm = 0;
+    double kinetic_energy = 0;
+    double entropy = 0;
+
 	while ( t <= T )
 	{
 		std::cout << "t = " << t << ". " << std::endl;
 
-		/*
-		if ( count++ % 8 == 0 )
+
+		if ( count % (10*16) == 0 )
 		{
 			interpolator_t sfx { K, xv, f, mu, num_threads };
 			plotf = sfx(plotX);
 			std::ofstream fstr( "f_" + std::to_string(t) + ".txt" );
-			std::ifstream f_exact_str("../../../PW/res=4096x8192_plotres=400/f_"+ std::to_string(t) + ".txt" );
-			double f_max_error = 0;
-			double f_l2_error = 0;
+			//std::ifstream f_exact_str("../../../PW/res=4096x8192_plotres=400/f_"+ std::to_string(t) + ".txt" );
+			//double f_max_error = 0;
+			//double f_l2_error = 0;
 			for ( size_t i = 0; i <= res; ++i )
 			{
 				for ( size_t j = 0; j <= res; ++j )
@@ -334,19 +345,23 @@ int main()
 					double f = plotf(j+(res+1)*i);
 					fstr << x << " " << v << " " << f << std::endl;
 
-					double f_exact = 0;
-					f_exact_str >> x >> v >> f_exact;
-					f_max_error = std::max(std::abs(f - f_exact), f_max_error);
-					f_l2_error += (f - f_exact)*(f - f_exact);
+					kinetic_energy += v*v*f;
+					if(f > 1e-10)
+					{
+						entropy += f*std::log(f);
+					}
+					l1_norm += std::abs(f);
+					l2_norm += f*f;
 				}
 				fstr << "\n";
-				f_exact_str.ignore();
 			}
 
-			str_f_max_err << t << " " << f_max_error << std::endl;
-			str_f_l2_err << t << " " << std::sqrt(hx_plot * hv_plot * f_l2_error) << std::endl;
+			kinetic_energy *= 0.5*hx_plot*hv_plot;
+			entropy *= hx_plot*hv_plot;
+			l1_norm *= hx_plot*hv_plot;
+			l2_norm = hx_plot*hv_plot*std::sqrt(l2_norm);
 		}
-		*/
+
 
 
 		vlasovius::misc::stopwatch clock;
@@ -383,8 +398,27 @@ int main()
 				}
 				E_l2_norm *= 0.5*dx_plot;
 				E_l2_str << t << " " << E_l2_norm << std::endl;
+
+				if ( count % (10*16) == 0 )
+				{
+		            statistics_file << t       << "; "
+		                            << l1_norm      << "; "
+		                            << l2_norm      << "; "
+		                            << E_l2_norm << "; "
+		                            << kinetic_energy << "; "
+		                            << E_l2_norm + kinetic_energy << "; "
+		                            << entropy << std::endl;
+
+		            l1_norm = 0;
+		            l2_norm = 0;
+		            kinetic_energy = 0;
+		            entropy = 0;
+				}
+
 			}
  		}
+
+
 
 		for ( size_t s = 0; s < 4; ++s )
 			xv += dt*d_rk4[s]*k_xv[s];

@@ -39,27 +39,28 @@ int main()
 {
 	constexpr size_t min_per_box = 200;
 
-	double L = 40 * 3.14159265358979323846;
+	//double L = 40 * 3.14159265358979323846;
+	double L = 4 * 3.14159265358979323846;
 	double Mr = 1000;
 	double vmax_electron = 8;
 	double vmax_ion = vmax_electron/(std::sqrt(Mr));
 	double Ue = -2;
 
 	wendland_t W;
-	arma::rowvec sigma_ion { 10, 2};
+	arma::rowvec sigma_ion { 1, 2};
 	kernel_t   K_ion ( W, sigma_ion );
 	kernel_t   Kx_ion( W, arma::rowvec { sigma_ion(0) } );
 	constexpr double tikhonov_mu_ion { 1e-10 };
 
-	arma::rowvec sigma_electron { 10, 2 };
+	arma::rowvec sigma_electron { 1, 2 };
 	kernel_t   K_electron  ( W, sigma_electron );
 	kernel_t   Kx_electron ( W, arma::rowvec { sigma_electron(0) } );
 	constexpr double tikhonov_mu_electron { 1e-10 };
 
-	size_t Nx_ion = 256, Nv_ion = 512;
-	size_t Nx_electron = 1024, Nv_electron = 1024;
+	size_t Nx_ion = 128, Nv_ion = 256;
+	size_t Nx_electron = 128, Nv_electron = 256;
 	std::cout << "Number of ion-particles: " << Nx_ion*Nv_ion << ".\n";
-	std::cout << "Number of ion-particles: " << Nx_electron*Nv_electron << ".\n";
+	std::cout << "Number of electron-particles: " << Nx_electron*Nv_electron << ".\n";
 
 	size_t num_threads = omp_get_max_threads();
 
@@ -120,7 +121,9 @@ int main()
 
 		f_electron( j + Nv_electron*i ) = std::sqrt(1.0 / (2.0 * M_PI))
 				* std::exp(-0.5 * (v - Ue) * (v - Ue) )
-				* (1 + 0.01 * (std::sin(x)
+				* (1 + 0.01 * std::cos(0.5*x));
+						/*
+						(std::sin(x)
 						+ std::sin(0.5 * x)
 						+ std::sin(0.1 * x)
 						+ std::sin(0.15 * x)
@@ -128,7 +131,7 @@ int main()
 						+ std::cos(0.25 * x)
 						+ std::cos(0.3 * x)
 						+ std::cos(0.35 * x)
-						));
+						)); */
 	}
 
 
@@ -158,7 +161,8 @@ int main()
 		}
 
 	size_t count = 0;
-	double t = 0, T = 1000.25, dt = 1./16.;
+	//double t = 0, T = 1000.25, dt = 1./16.;
+	double t = 0, T = 100.25, dt = 1./16.;
 	std::ofstream str("E.txt");
 	vlasovius::misc::stopwatch global_clock;
 	while ( t < T )
