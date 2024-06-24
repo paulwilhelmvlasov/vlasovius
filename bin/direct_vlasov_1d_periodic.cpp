@@ -226,7 +226,7 @@ int main()
 	kernel_t K( sigma_x, sigma_v, L );
 
 
-	size_t num_threads = omp_get_max_threads();
+	size_t num_threads = 6;//omp_get_max_threads();
 
 	// Runge--Kutta Butcher tableau.
 	constexpr double c_rk4[4][4] = { {   0,   0,  0, 0 },
@@ -265,7 +265,7 @@ int main()
 		}
 
 	// Initialise xv.
-	size_t Nx = 16, Nv = 64;
+	size_t Nx = 32, Nv = 128;
 	xv.set_size( Nx*Nv,2 );
 	f.resize( Nx*Nv );
 	for ( size_t i = 0; i < Nx; ++i )
@@ -279,16 +279,15 @@ int main()
 		constexpr double alpha = 0.01;
 		constexpr double k     = 0.5;
 		// Linear Landau damping:
-/*
 		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
 					* std::exp(-0.5 * v * v);
-*/
+
 
 		// Two Stream Instability:
-
+/*
 		f( j + Nv*i ) = 0.39894228040143267793994 * ( 1. + alpha*std::cos(k*x) )
 						* v * v * std::exp(-0.5 * v * v);
-
+*/
 
 		/*
 		// Bump on tail benchmark:
@@ -328,7 +327,7 @@ int main()
 		std::cout << "t = " << t << ". " << std::endl;
 
 
-		if ( count % (10*16) == 0 )
+		if ( count % (25*16) == 0 )
 		{
 			interpolator_t sfx { K, xv, f, mu, num_threads };
 			plotf = sfx(plotX);
@@ -399,6 +398,7 @@ int main()
 				E_l2_norm *= 0.5*dx_plot;
 				E_l2_str << t << " " << E_l2_norm << std::endl;
 
+				/*
 				if ( count % (10*16) == 0 )
 				{
 		            statistics_file << t       << "; "
@@ -414,7 +414,7 @@ int main()
 		            kinetic_energy = 0;
 		            entropy = 0;
 				}
-
+				*/
 			}
  		}
 

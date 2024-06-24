@@ -33,7 +33,7 @@ piecewise_vlasov_1d_periodic_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la
 #piecewise_vlasov_2d_periodic_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp -lfftw3 -lfftw3f
 
 piecewise_vlasov_1d_ion_turbulence_SOURCES = piecewise_vlasov_1d_ion_turbulence.cpp
-piecewise_vlasov_1d_ion_turbulence_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp
+piecewise_vlasov_1d_ion_turbulence_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp -lfftw3 -lfftw3f
 
 #vortex_direct_interpolation_SOURCES = vortex_direct_interpolation.cpp
 #vortex_direct_interpolation_LDADD   = $(top_builddir)/vlasovius/libvlasovius.la $(BLAS_LIBS) -lgmp

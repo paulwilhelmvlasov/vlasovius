@@ -44,15 +44,15 @@ int main()
 	//double L = 2*3.14159265358979323846 / 0.3; // Bump on tail
 
 	wendland_t W;
-	arma::rowvec sigma { 1, 0.5 };
+	arma::rowvec sigma { 2, 1 };
 	kernel_t   K ( W, sigma );
 	kernel_t   Kx( W, arma::rowvec { sigma(0) } );
 
 
-	size_t Nx = 64, Nv = 256;
+	size_t Nx = 32, Nv = 4*Nx;
 	std::cout << "Number of particles: " << Nx*Nv << ".\n";
 
-	size_t num_threads = omp_get_max_threads();
+	size_t num_threads = 6;//omp_get_max_threads();
 
 	arma::mat xv;
 	arma::vec f;
@@ -63,7 +63,7 @@ int main()
 	arma::vec rho( rho_points.size() );
 	vlasovius::geometry::kd_tree rho_tree(rho_points);
 
-	double vmax = 6;
+	double vmax = 8;
 
 	// Initialise xv.
 	xv.set_size( Nx*Nv,2 );
@@ -144,12 +144,11 @@ int main()
 		//if ( t + dt > T ) dt = T - t;
 
 
-		if ( count % (10*16) == 0 )
+		if ( count % (25*16) == 0)
 		{
 			interpolator_t sfx { K, xv, f, min_per_box, tikhonov_mu, num_threads };
 			plotf = sfx(plotX);
 			std::ofstream fstr( "f_" + std::to_string(t) + ".txt" );
-
 			for ( size_t i = 0; i <= res; ++i )
 			{
 				for ( size_t j = 0; j <= res; ++j )
@@ -242,7 +241,8 @@ int main()
 		e_l2_str << t << " " << l2_e  << std::endl;
 		std::cout << "Max-norm of E: " << max_e << "." << std::endl;
 
-		if ( count % (10*16) == 0 )
+		/*
+		if ( count % (2*16) == 0 )
 		{
             statistics_file << t       << "; "
                             << l1_norm      << "; "
@@ -256,7 +256,17 @@ int main()
             l2_norm = 0;
             kinetic_energy = 0;
             entropy = 0;
+
+			std::ofstream Estr( "E_" + std::to_string(t) + ".txt" );
+			for ( size_t i = 0; i <= res; ++i )
+			{
+				double x = i*hx_plot;
+				double E = poisson.E(x);
+
+				Estr << x << " " << E << std::endl;
+			}
 		}
+		*/
 
 		double elapsed = clock.elapsed();
 		timeStepCounter++;

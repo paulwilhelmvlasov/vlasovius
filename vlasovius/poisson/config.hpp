@@ -119,14 +119,14 @@ struct config_t
 template <typename real>
 config_t<real>::config_t() noexcept
 {
-    Nx = 512;
+    Nx = 128;
     Nu = 2048;
     u_min = -10;
     u_max =  10;
     x_min = 0;
-    x_max = 4*M_PI;;
+    x_max = 40*M_PI;;
     
-    dt = 1./16.; Nt = 100/dt;
+    dt = 1./8.; Nt = 2000/dt;
 
     Lx = x_max - x_min; Lx_inv = 1/Lx;
     dx = Lx/Nx; dx_inv = 1/dx;

@@ -20,8 +20,8 @@ inline double f0_1d(double x, double v)
     constexpr double k     = 0.5;
     constexpr double fac   = 0.39894228040143267793994;
 
-    //return fac*(1+alpha*cos(k*x))*exp(-v*v/2) * v*v;
-    return fac*(1+alpha*cos(k*x))*exp(-v*v/2);
+    return fac*(1+alpha*cos(k*x))*exp(-v*v/2) * v*v;
+    //return fac*(1+alpha*cos(k*x))*exp(-v*v/2);
 }
 
 inline double f0_1d_electron(double x, double v)
@@ -139,7 +139,7 @@ void ion_acoustic()
     const double L  = 4*3.14159265358979323846;
     const size_t Nx_f = 128;
     const size_t Nx_poisson = Nx_f/2;
-    const size_t Nv_f_electron = 512;
+    const size_t Nv_f_electron = 256;
     const size_t Nv_f_ion = Nv_f_electron;
     const size_t N_f_electron = Nx_f*Nv_f_electron;
     const size_t N_f_ion = Nx_f*Nv_f_ion;
@@ -355,12 +355,12 @@ void single_species()
 	// This is an implementation of Wang et.al. 2nd-order PIC (see section 3.2).
 	// Set parameters.
     const double L  = 4*3.14159265358979323846;
-    const size_t Nx_f = 128;
-    const size_t Nx_poisson = Nx_f/2;
-    const size_t Nv_f = 256;
+    const size_t Nx_f = 256;
+    const size_t Nx_poisson = Nx_f*2;
+    const size_t Nv_f = 4*Nx_f;
     const size_t N_f = Nx_f*Nv_f;
-    const double v_min = -6;
-    const double v_max =  6;
+    const double v_min = -8;
+    const double v_max =  8;
 
     // Compute derived quantities.
     const double eps_x = L/Nx_f;
@@ -369,8 +369,8 @@ void single_species()
     const double delta_x_inv = 1/delta_x;
     const double L_inv  = 1/L;
 
-    const size_t Nt = 0;//30 * 16;
-    const double T = 30;
+    const size_t Nt = 100 * 16;
+    const double T = 100;
     const double dt = 1.0 / 16.0;
 
     const size_t n_remap = 5;
@@ -390,8 +390,7 @@ void single_species()
         size_t k = j+Nv_f*i;
         xv(k, 0 ) = x;
         xv(k, 1 ) = v;
-        //Q(k)     = eps_x*eps_v*f0_1d(x,v);
-        Q(k)     = eps_x*eps_v*f0_1d_electron(x,v);
+        Q(k)     = eps_x*eps_v*f0_1d(x,v);
     }
 
     arma::vec rho(Nx_poisson + 1);
@@ -422,15 +421,8 @@ void single_species()
     			rho(i) -= Q(k) * shape_function_1d( x - xv(k,0), delta_x);
     		}
     	}
-        rho(0) = 0;
-        rho(Nx_poisson) = rho(0);
-
-        std::ofstream rho_electron_str("rho_electron.txt");
-        for(size_t i = 1; i < Nx_poisson; i++)
-    	{
-    		double x = i*delta_x;
-    		rho_electron_str << x << " " << rho(i) << std::endl;
-    	}
+        rho(0) = 0.5*(rho(1)+rho(Nx_poisson-1));
+        rho(Nx_poisson) =  rho(0);
 
     	// Solve for electric potential.
     	varphi = arma::solve(poiss_solve_matrix, rho);
@@ -441,7 +433,7 @@ void single_species()
     	{
     		E(j) = -0.5*delta_x_inv * (varphi(j+1) - varphi(j-1));
     	}
-    	E(0) = 0;
+    	E(0) = 0.5*(E(1)+E(Nx_poisson-1));
     	E(Nx_poisson) = E(0);
 
     	// Move in particles.
@@ -497,7 +489,7 @@ void single_species()
     	E_l2_str << t << " " << E_l2 << std::endl;
     	std::cout << "E_max = " << E_max << std::endl;
 
-    	if(nt % (10*16) == 0)
+    	if(nt % (25*16) == 0 && false)
     	{
     		size_t plot_x = 256;
     		size_t plot_v = plot_x;
@@ -531,13 +523,13 @@ void single_species()
     	}
     }
 
-    //std::cout << "Average time per time step: " << t_total/Nt << " s." << std::endl;
+    std::cout << "Average time per time step: " << t_total/Nt << " s." << std::endl;
     std::cout << "Total time: " << t_total << " s." << std::endl;
 }
 
 int main() {
-	//single_species();
-	ion_acoustic();
+	single_species();
+	//ion_acoustic();
 
 	return 0;
 }

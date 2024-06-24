@@ -19,6 +19,7 @@ configure
 depcomp
 install-sh
 makefile
+test/*
 makefile.in
 Makefile
 Makefile.in
