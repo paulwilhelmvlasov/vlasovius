@@ -36,3 +36,4 @@ bin/*
 !bin/makefile.am
 test_direct_interpolator.txt
 /build/
+/test
